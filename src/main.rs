@@ -3,6 +3,7 @@ use std::error::Error;
 use crate::ui::app::App;
 
 mod ui;
+mod utils;
 
 fn main() -> Result<(), Box<dyn Error>> {
     ratatui::run(|terminal| {

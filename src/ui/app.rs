@@ -1,33 +1,40 @@
 use std::io::{Result, Stdout};
 
 use ratatui::{
-    Frame, Terminal,
+    Terminal,
     crossterm::event::{self, Event, KeyCode, KeyEventKind},
     prelude::CrosstermBackend,
+    widgets::ListState,
 };
 
-use crate::ui::screens;
+use crate::ui::screens::HomeScreen;
 
 pub enum CurrentScreen {
     Main,
 }
 
 pub struct App {
-    pub current_screen: CurrentScreen,
     should_quit: bool,
+    current_screen: CurrentScreen,
+    pub list_state: ListState,
 }
 
 impl App {
     pub fn new() -> Self {
+        let mut list_state = ListState::default();
+        list_state.select_first();
         Self {
-            current_screen: CurrentScreen::Main,
             should_quit: false,
+            current_screen: CurrentScreen::Main,
+            list_state,
         }
     }
 
     pub fn run(&mut self, terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Result<()> {
         while !self.should_quit {
-            terminal.draw(|frame| self.render(frame))?;
+            terminal.draw(|frame| match self.current_screen {
+                CurrentScreen::Main => HomeScreen::draw(self, frame).unwrap(),
+            })?;
 
             if let Event::Key(key) = event::read()? {
                 self.handle_key_event(key);
@@ -37,19 +44,15 @@ impl App {
         Ok(())
     }
 
-    fn render(&mut self, frame: &mut Frame) {
-        match self.current_screen {
-            CurrentScreen::Main => screens::home(frame, self),
-        }
-    }
-
     fn handle_key_event(&mut self, key: event::KeyEvent) {
         if key.kind != KeyEventKind::Press {
             return;
         }
 
-        match key.code {
-            KeyCode::Char('q') | KeyCode::Esc => self.should_quit = true,
+        match (&self.current_screen, key.code) {
+            (CurrentScreen::Main, KeyCode::Down) => self.list_state.select_next(),
+            (CurrentScreen::Main, KeyCode::Up) => self.list_state.select_previous(),
+            (_, KeyCode::Char('q') | KeyCode::Esc) => self.should_quit = true,
             _ => {}
         }
     }
