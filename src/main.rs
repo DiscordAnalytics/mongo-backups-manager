@@ -17,14 +17,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     match cli.command {
         None | Some(Commands::Tui) => ratatui::run(|terminal| {
             let mut app = App::new();
-            let res = app.run(terminal);
-            if let Err(err) = res {
-                println!("{err:?}");
+            if let Err(err) = app.run(terminal) {
+                eprintln!("{err:?}");
             }
         }),
-        Some(Commands::Help) => {
-            println!("Hello world")
-        }
     };
 
     Ok(())

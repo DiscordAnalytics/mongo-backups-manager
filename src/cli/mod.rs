@@ -10,5 +10,4 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     Tui,
-    Help,
 }
