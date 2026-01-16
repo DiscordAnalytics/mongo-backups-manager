@@ -7,7 +7,7 @@ use ratatui::{
     widgets::ListState,
 };
 
-use crate::ui::screens::HomeScreen;
+use crate::ui::screens::{HomeScreen, line_to_string};
 
 pub enum CurrentScreen {
     Main,
@@ -61,7 +61,7 @@ impl App {
                 let lines = HomeScreen::list_items();
                 if let Some(idx) = self.list_state.selected() {
                     if let Some(line) = lines.get(idx) {
-                        let label = HomeScreen::line_to_string(line);
+                        let label = line_to_string(line);
                         match label.as_str() {
                             "Exit" => self.should_quit = true,
                             _ => {}

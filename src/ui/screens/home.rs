@@ -50,11 +50,4 @@ impl HomeScreen {
             Line::from("Exit").alignment(HorizontalAlignment::Center),
         ]
     }
-
-    pub fn line_to_string(line: &Line) -> String {
-        line.spans
-            .iter()
-            .map(|span| span.content.as_ref())
-            .collect()
-    }
 }
