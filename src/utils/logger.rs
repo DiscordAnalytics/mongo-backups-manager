@@ -22,7 +22,7 @@ impl Logger {
     fn get_date() -> String {
         let date = chrono::Local::now();
 
-        date.format("%%d/%m/%Y %H:%M:%S").to_string()
+        date.format("%d/%m/%Y %H:%M:%S").to_string()
     }
 
     fn log(text: &str, color: Option<Color>) {

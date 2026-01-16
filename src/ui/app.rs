@@ -3,9 +3,9 @@ use std::io::{self, Result};
 use ratatui::{
     Terminal,
     crossterm::{
-        event::{self, EnableMouseCapture, Event, KeyCode, KeyEventKind},
+        event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
         execute,
-        terminal::{EnterAlternateScreen, enable_raw_mode},
+        terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
     },
     prelude::CrosstermBackend,
     widgets::ListState,
@@ -40,15 +40,28 @@ impl App {
         execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend)?;
+
         while !self.should_quit {
             terminal.draw(|frame| match self.current_screen {
-                CurrentScreen::Main => HomeScreen::draw(self, frame).unwrap(),
+                CurrentScreen::Main => {
+                    if let Err(e) = HomeScreen::draw(self, frame) {
+                        eprintln!("Draw error: {}", e);
+                    }
+                }
             })?;
 
             if let Event::Key(key) = event::read()? {
                 self.handle_key_event(key);
             }
         }
+
+        disable_raw_mode()?;
+        execute!(
+            terminal.backend_mut(),
+            LeaveAlternateScreen,
+            DisableMouseCapture
+        )?;
+        terminal.show_cursor()?;
 
         Ok(())
     }
