@@ -25,12 +25,18 @@ impl HomeScreen {
             .centered();
         frame.render_widget(greeting, area);
 
+        let quit_action = Block::new().title_bottom(Line::from("Esc or q to quit").centered());
+        frame.render_widget(quit_action, area);
+
         let list_block = Block::bordered().border_type(BorderType::Rounded);
-        let items = ["Choice 1", "Choice 2", "Choice 3"];
+        let items = [
+            Line::from("Backups").alignment(HorizontalAlignment::Center),
+            Line::from("Exit").alignment(HorizontalAlignment::Center),
+        ];
         let list = List::new(items)
             .block(list_block)
             .highlight_style(Style::new().reversed())
-            .highlight_symbol("▶ ")
+            .highlight_symbol("▶")
             .repeat_highlight_symbol(true)
             .direction(ListDirection::TopToBottom);
         frame.render_stateful_widget(list, centered_area(area), &mut app.list_state);

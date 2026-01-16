@@ -57,6 +57,12 @@ impl App {
         match (&self.current_screen, key.code) {
             (CurrentScreen::Main, KeyCode::Down) => self.list_state.select_next(),
             (CurrentScreen::Main, KeyCode::Up) => self.list_state.select_previous(),
+            (CurrentScreen::Main, KeyCode::Enter) => {
+                match self.list_state.selected() {
+                    Some(1_usize) => self.should_quit = true,
+                    Some(_) | None => {}
+                };
+            }
             (_, KeyCode::Char('q') | KeyCode::Esc) => self.should_quit = true,
             _ => {}
         }
