@@ -29,11 +29,7 @@ impl HomeScreen {
         frame.render_widget(quit_action, area);
 
         let list_block = Block::bordered().border_type(BorderType::Rounded);
-        let items = [
-            Line::from("Backups").alignment(HorizontalAlignment::Center),
-            Line::from("Exit").alignment(HorizontalAlignment::Center),
-        ];
-        let list = List::new(items)
+        let list = List::new(Self::list_items())
             .block(list_block)
             .highlight_style(Style::new().reversed())
             .highlight_symbol("▶")
@@ -46,5 +42,19 @@ impl HomeScreen {
         frame.render_widget(desc_block, centered_area(area));
 
         Ok(())
+    }
+
+    pub fn list_items() -> Vec<Line<'static>> {
+        vec![
+            Line::from("Backups").alignment(HorizontalAlignment::Center),
+            Line::from("Exit").alignment(HorizontalAlignment::Center),
+        ]
+    }
+
+    pub fn line_to_string(line: &Line) -> String {
+        line.spans
+            .iter()
+            .map(|span| span.content.as_ref())
+            .collect()
     }
 }

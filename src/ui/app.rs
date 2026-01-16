@@ -58,10 +58,16 @@ impl App {
             (CurrentScreen::Main, KeyCode::Down) => self.list_state.select_next(),
             (CurrentScreen::Main, KeyCode::Up) => self.list_state.select_previous(),
             (CurrentScreen::Main, KeyCode::Enter) => {
-                match self.list_state.selected() {
-                    Some(1_usize) => self.should_quit = true,
-                    Some(_) | None => {}
-                };
+                let lines = HomeScreen::list_items();
+                if let Some(idx) = self.list_state.selected() {
+                    if let Some(line) = lines.get(idx) {
+                        let label = HomeScreen::line_to_string(line);
+                        match label.as_str() {
+                            "Exit" => self.should_quit = true,
+                            _ => {}
+                        }
+                    }
+                }
             }
             (_, KeyCode::Char('q') | KeyCode::Esc) => self.should_quit = true,
             _ => {}
