@@ -44,6 +44,11 @@ impl App {
         Ok(())
     }
 
+    pub fn set_screen(&mut self, screen: CurrentScreen) {
+        self.list_state.select_first();
+        self.current_screen = screen;
+    }
+
     fn handle_key_event(&mut self, key: event::KeyEvent) {
         if key.kind != KeyEventKind::Press {
             return;

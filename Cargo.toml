@@ -3,8 +3,19 @@ name = "mdbbm"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "mdbbm"
+path = "src/main.rs"
+
 [dependencies]
-chrono = { version = "0.4.43", default-features = false, features = ["std", "clock"] }
+chrono = { version = "0.4.43", default-features = false, features = [
+  "std",
+  "clock",
+] }
+clap = { version = "4.5.54", default-features = false, features = [
+  "std",
+  "derive",
+] }
 ratatui = { version = "0.30.0", default-features = false, features = [
   "crossterm",
 ] }
