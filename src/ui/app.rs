@@ -1,13 +1,17 @@
-use std::io::{Result, Stdout};
+use std::io::{self, Result};
 
 use ratatui::{
     Terminal,
-    crossterm::event::{self, Event, KeyCode, KeyEventKind},
+    crossterm::{
+        event::{self, EnableMouseCapture, Event, KeyCode, KeyEventKind},
+        execute,
+        terminal::{EnterAlternateScreen, enable_raw_mode},
+    },
     prelude::CrosstermBackend,
     widgets::ListState,
 };
 
-use crate::ui::screens::{HomeItem, HomeScreen, line_to_string};
+use crate::ui::screens::{HomeItem, HomeScreen};
 
 pub enum CurrentScreen {
     Main,
@@ -30,7 +34,12 @@ impl App {
         }
     }
 
-    pub fn run(&mut self, terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Result<()> {
+    pub fn run(&mut self) -> Result<()> {
+        enable_raw_mode()?;
+        let mut stdout = io::stdout();
+        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+        let backend = CrosstermBackend::new(stdout);
+        let mut terminal = Terminal::new(backend)?;
         while !self.should_quit {
             terminal.draw(|frame| match self.current_screen {
                 CurrentScreen::Main => HomeScreen::draw(self, frame).unwrap(),

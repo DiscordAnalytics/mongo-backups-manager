@@ -15,12 +15,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
 
     match cli.command {
-        None | Some(Commands::Tui) => ratatui::run(|terminal| {
-            let mut app = App::new();
-            if let Err(err) = app.run(terminal) {
-                eprintln!("{err:?}");
-            }
-        }),
+        None | Some(Commands::Tui) => App::new().run()?,
     };
 
     Ok(())
