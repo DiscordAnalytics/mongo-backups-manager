@@ -5,10 +5,29 @@ use ratatui::{
     layout::HorizontalAlignment,
     style::{Style, Stylize},
     text::Line,
-    widgets::{Block, BorderType, List, ListDirection, Paragraph},
+    widgets::{Block, BorderType, List, ListDirection, ListItem, Paragraph},
 };
 
-use crate::ui::{app::App, screens::centered_area};
+use crate::ui::{
+    app::App,
+    screens::{centered_area, to_list_items},
+};
+
+pub enum HomeItem {
+    Backups,
+    Exit,
+}
+
+impl From<&HomeItem> for ListItem<'_> {
+    fn from(value: &HomeItem) -> Self {
+        let line = Line::from(match value {
+            HomeItem::Backups => "Backups",
+            HomeItem::Exit => "Exit",
+        })
+        .alignment(HorizontalAlignment::Center);
+        ListItem::new(line)
+    }
+}
 
 pub struct HomeScreen;
 
@@ -29,7 +48,7 @@ impl HomeScreen {
         frame.render_widget(quit_action, area);
 
         let list_block = Block::bordered().border_type(BorderType::Rounded);
-        let list = List::new(Self::list_items())
+        let list = List::new(to_list_items(Self::list_items()))
             .block(list_block)
             .highlight_style(Style::new().reversed())
             .highlight_symbol("▶")
@@ -44,10 +63,7 @@ impl HomeScreen {
         Ok(())
     }
 
-    pub fn list_items() -> Vec<Line<'static>> {
-        vec![
-            Line::from("Backups").alignment(HorizontalAlignment::Center),
-            Line::from("Exit").alignment(HorizontalAlignment::Center),
-        ]
+    pub fn list_items() -> Vec<HomeItem> {
+        vec![HomeItem::Backups, HomeItem::Exit]
     }
 }
