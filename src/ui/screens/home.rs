@@ -63,7 +63,8 @@ impl HomeScreen {
         Ok(())
     }
 
-    pub fn list_items() -> Vec<HomeItem> {
-        vec![HomeItem::Backups, HomeItem::Exit]
+    pub fn list_items() -> &'static [HomeItem] {
+        static ITEMS: [HomeItem; 2] = [HomeItem::Backups, HomeItem::Exit];
+        &ITEMS
     }
 }
