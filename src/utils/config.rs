@@ -160,37 +160,37 @@ impl Config {
 
     let property_name = captures.get(2).map_or("", |m| m.as_str());
     let property_raw_value = captures.get(3).map_or("", |m| m.as_str());
+    match Self::parse_property_value(property_raw_value) {
+      Ok(value) => Ok(TomlProperty {
+        name: property_name.to_string(),
+        value
+      }),
+      Err(_) => Err(format!("Invalid property type at line {}", index + 1))
+    }
+  }
 
+  fn parse_property_value (raw_value: &str) -> Result<TomlValue, String> {
     let string_value_regex = Regex::new(r#"^(['"])([^'"]*)\1$"#).map_err(|e| e.to_string())?;
     let int_value_regex = Regex::new(r"^[0-9]+$").map_err(|e| e.to_string())?;
     let bool_value_regex = Regex::new(r"^(true)|(false)$").map_err(|e| e.to_string())?;
 
-    if string_value_regex.is_match(property_raw_value).unwrap() {
-      let property_raw_value = string_value_regex.captures(property_raw_value).unwrap().unwrap();
-      let property_value = property_raw_value.get(2).map_or("", |m| m.as_str());
+    if string_value_regex.is_match(raw_value).unwrap() {
+      let raw_value = string_value_regex.captures(raw_value).unwrap().unwrap();
+      let property_value = raw_value.get(2).map_or("", |m| m.as_str());
 
-      Ok(TomlProperty {
-        name: property_name.to_string(),
-        value: TomlValue::String(property_value.to_string())
-      })
-    } else if int_value_regex.is_match(property_raw_value).unwrap() {
-      let property_raw_value = int_value_regex.captures(property_raw_value).unwrap().unwrap();
-      let property_value = property_raw_value.get(0).map_or(0, |m| m.as_str().parse().unwrap());
+      Ok(TomlValue::String(property_value.to_string()))
+    } else if int_value_regex.is_match(raw_value).unwrap() {
+      let raw_value = int_value_regex.captures(raw_value).unwrap().unwrap();
+      let property_value = raw_value.get(0).map_or(0, |m| m.as_str().parse().unwrap());
 
-      Ok(TomlProperty {
-        name: property_name.to_string(),
-        value: TomlValue::Int(property_value)
-      })
-    } else if bool_value_regex.is_match(property_raw_value).unwrap() {
-      let property_raw_value = bool_value_regex.captures(property_raw_value).unwrap().unwrap();
-      let property_value = property_raw_value.get(0).map_or(false, |m| m.as_str() == "true");
+      Ok(TomlValue::Int(property_value))
+    } else if bool_value_regex.is_match(raw_value).unwrap() {
+      let raw_value = bool_value_regex.captures(raw_value).unwrap().unwrap();
+      let property_value = raw_value.get(0).map_or(false, |m| m.as_str() == "true");
 
-      Ok(TomlProperty {
-        name: property_name.to_string(),
-        value: TomlValue::Bool(property_value)
-      })
+      Ok(TomlValue::Bool(property_value))
     } else {
-      Err(format!("Invalid property type at line {}", index + 1))
+      Err("Invalid property type".to_string())
     }
   }
 }
