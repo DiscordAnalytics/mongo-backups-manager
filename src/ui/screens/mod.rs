@@ -1,5 +1,8 @@
 mod home;
 pub use home::{HomeItem, HomeScreen};
+mod layout;
+pub use layout::ScreenLayout;
+
 use ratatui::{
     layout::{Constraint, Rect},
     widgets::ListItem,

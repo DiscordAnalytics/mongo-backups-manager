@@ -10,7 +10,7 @@ use ratatui::{
 
 use crate::ui::{
     app::App,
-    screens::{centered_area, to_list_items},
+    screens::{ScreenLayout, centered_area, to_list_items},
 };
 
 pub enum HomeItem {
@@ -33,19 +33,9 @@ pub struct HomeScreen;
 
 impl HomeScreen {
     pub fn draw(app: &mut App, frame: &mut Frame) -> Result<()> {
+        ScreenLayout::draw(frame);
+
         let area = frame.area();
-
-        let title = Block::bordered()
-            .border_type(BorderType::Rounded)
-            .title("MongoDB Backup Manager".bold())
-            .title_alignment(HorizontalAlignment::Center);
-        let greeting = Paragraph::new("Welcome to MongoDB Backup Manager!")
-            .block(title)
-            .centered();
-        frame.render_widget(greeting, area);
-
-        let quit_action = Block::new().title_bottom(Line::from("Esc or q to quit").centered());
-        frame.render_widget(quit_action, area);
 
         let list_block = Block::bordered().border_type(BorderType::Rounded);
         let list = List::new(to_list_items(Self::list_items()))
