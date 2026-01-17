@@ -7,15 +7,19 @@ use std::{
 use std::collections::HashMap;
 use fancy_regex::Regex;
 
+#[derive(Debug)]
 enum DatastoreType {
-  FileSystem
+  FileSystem,
+  S3
 }
 
+#[derive(Debug)]
 struct Datastore {
   storage_type: DatastoreType,
   path: String,
 }
 
+#[derive(Debug)]
 struct Backup {
   display_name: String,
   connection_string: String,
@@ -29,7 +33,7 @@ enum TomlValue {
   String(String),
   Int(i32),
   Bool(bool),
-  Object(Box<TomlValue>),
+  Object(HashMap<String, TomlValue>),
   None
 }
 
@@ -124,6 +128,28 @@ impl Config {
         Some(TomlValue::None) | None => None,
         _ => panic!("Expected String or None value for property `encryption_key`")
       };
+      let datastore = match properties.get("datastore") {
+        Some(TomlValue::Object(datastore)) => {
+          let storage_type = match datastore.get("type") {
+            Some(TomlValue::String(value)) => match value.as_str() {
+              "filesystem" => DatastoreType::FileSystem,
+              "s3" => DatastoreType::S3,
+              _ => panic!("Invalid datastore type")
+            },
+            _ => panic!("Expected String value for property `datastore.type`")
+          };
+          let path = match datastore.get("path") {
+            Some(TomlValue::String(value)) => value.to_string(),
+            _ => panic!("Expected String value for property `datastore.path`")
+          };
+
+          Datastore {
+            storage_type,
+            path
+          }
+        },
+        _ => panic!("Expected Object value for property `datastore`")
+      };
 
       if encryption_key.as_deref().is_some_and(|k| k.len() != 64) {
         panic!("`encryption_key` is invalid. You can use the `mdbmcli generate-key` command to get one.")
@@ -132,14 +158,13 @@ impl Config {
       self.backups.entry(backup_name.clone()).insert_entry(Backup {
         display_name: backup_name,
         connection_string,
-        store: Datastore {
-          storage_type: DatastoreType::FileSystem,
-          path: "/var/lib/mbm".to_string()
-        },
+        store: datastore,
         schedule,
         encryption_key,
       });
     }
+
+    println!("\n{:?}", self.backups)
   }
 
   fn parse_property (line: &str, index: u16) -> Result<TomlProperty, String> {
@@ -173,6 +198,7 @@ impl Config {
     let string_value_regex = Regex::new(r#"^(['"])([^'"]*)\1$"#).map_err(|e| e.to_string())?;
     let int_value_regex = Regex::new(r"^[0-9]+$").map_err(|e| e.to_string())?;
     let bool_value_regex = Regex::new(r"^(true)|(false)$").map_err(|e| e.to_string())?;
+    let obj_value_regex = Regex::new(r"^\{(.*)\}$").map_err(|e| e.to_string())?;
 
     if string_value_regex.is_match(raw_value).unwrap() {
       let raw_value = string_value_regex.captures(raw_value).unwrap().unwrap();
@@ -189,6 +215,25 @@ impl Config {
       let property_value = raw_value.get(0).map_or(false, |m| m.as_str() == "true");
 
       Ok(TomlValue::Bool(property_value))
+    } else if obj_value_regex.is_match(raw_value).unwrap() {
+      let raw_value = obj_value_regex.captures(raw_value).unwrap().unwrap();
+      let obj_content = raw_value.get(0).map_or("", |m| m.as_str());
+
+      let property_regex = Regex::new(r#"\w+\s*[=:]\s*(?:"[^"]*"|'[^']*'|\d+(?:\.\d+)?|true|false)"#).map_err(|e| e.to_string())?;
+      let mut obj_properties: HashMap<String, TomlValue> = HashMap::new();
+
+      for cap in property_regex.find_iter(obj_content) {
+        if let Ok(property) = cap {
+          let property = Self::parse_property(property.as_str(), 0);
+
+          if property.is_ok() {
+            let parsed_property = property?;
+            obj_properties.entry(parsed_property.name).insert_entry(parsed_property.value);
+          }
+        }
+      }
+
+      Ok(TomlValue::Object(obj_properties))
     } else {
       Err("Invalid property type".to_string())
     }
