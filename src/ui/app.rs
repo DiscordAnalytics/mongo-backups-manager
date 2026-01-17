@@ -11,10 +11,11 @@ use ratatui::{
     widgets::ListState,
 };
 
-use crate::ui::screens::{HomeItem, HomeScreen};
+use crate::ui::screens::{HomeItem, HomeScreen, SettingsScreen};
 
 pub enum CurrentScreen {
     Main,
+    Settings,
 }
 
 pub struct App {
@@ -45,6 +46,11 @@ impl App {
             terminal.draw(|frame| match self.current_screen {
                 CurrentScreen::Main => {
                     if let Err(e) = HomeScreen::draw(self, frame) {
+                        eprintln!("Draw error: {}", e);
+                    }
+                }
+                CurrentScreen::Settings => {
+                    if let Err(e) = SettingsScreen::draw(self, frame) {
                         eprintln!("Draw error: {}", e);
                     }
                 }
@@ -84,6 +90,7 @@ impl App {
                 if let Some(idx) = self.list_state.selected() {
                     match items[idx] {
                         HomeItem::Backups => {}
+                        HomeItem::Settings => self.set_screen(CurrentScreen::Settings),
                         HomeItem::Exit => self.should_quit = true,
                     }
                 }

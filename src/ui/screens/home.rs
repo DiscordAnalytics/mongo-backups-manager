@@ -3,9 +3,9 @@ use std::io::Result;
 use ratatui::{
     Frame,
     layout::HorizontalAlignment,
-    style::{Style, Stylize},
+    style::Style,
     text::Line,
-    widgets::{Block, BorderType, List, ListDirection, ListItem, Paragraph},
+    widgets::{Block, BorderType, List, ListDirection, ListItem},
 };
 
 use crate::ui::{
@@ -15,6 +15,7 @@ use crate::ui::{
 
 pub enum HomeItem {
     Backups,
+    Settings,
     Exit,
 }
 
@@ -22,6 +23,7 @@ impl From<&HomeItem> for ListItem<'_> {
     fn from(value: &HomeItem) -> Self {
         let line = Line::from(match value {
             HomeItem::Backups => "Backups",
+            HomeItem::Settings => "Settings",
             HomeItem::Exit => "Exit",
         })
         .alignment(HorizontalAlignment::Center);
@@ -33,7 +35,7 @@ pub struct HomeScreen;
 
 impl HomeScreen {
     pub fn draw(app: &mut App, frame: &mut Frame) -> Result<()> {
-        ScreenLayout::draw(frame);
+        ScreenLayout::draw(frame, None);
 
         let area = frame.area();
 
@@ -54,7 +56,7 @@ impl HomeScreen {
     }
 
     pub fn list_items() -> &'static [HomeItem] {
-        static ITEMS: [HomeItem; 2] = [HomeItem::Backups, HomeItem::Exit];
+        static ITEMS: [HomeItem; 3] = [HomeItem::Backups, HomeItem::Settings, HomeItem::Exit];
         &ITEMS
     }
 }

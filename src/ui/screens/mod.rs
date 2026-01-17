@@ -2,6 +2,8 @@ mod home;
 pub use home::{HomeItem, HomeScreen};
 mod layout;
 pub use layout::ScreenLayout;
+mod settings;
+pub use settings::SettingsScreen;
 
 use ratatui::{
     layout::{Constraint, Rect},
