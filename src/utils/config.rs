@@ -8,23 +8,29 @@ use std::collections::HashMap;
 use fancy_regex::Regex;
 
 #[derive(Debug)]
-enum DatastoreType {
+enum BackupDatastoreType {
   FileSystem,
   S3
 }
 
 #[derive(Debug)]
-struct Datastore {
-  storage_type: DatastoreType,
+struct BackupDatastore {
+  storage_type: BackupDatastoreType,
   path: String,
+}
+
+#[derive(Debug)]
+struct BackupSchedule {
+  enabled: bool,
+  cron: String,
 }
 
 #[derive(Debug)]
 struct Backup {
   display_name: String,
   connection_string: String,
-  store: Datastore,
-  schedule: Option<String>,
+  store: BackupDatastore,
+  schedule: BackupSchedule,
   encryption_key: Option<String>,
 }
 
@@ -119,8 +125,25 @@ impl Config {
         _ => panic!("Expected String value for property `connection_string`")
       };
       let schedule = match properties.get("schedule") {
-        Some(TomlValue::String(value)) => Option::from(value.to_string()),
-        Some(TomlValue::None) | None => None,
+        Some(TomlValue::Object(schedule)) => {
+          let enabled = match schedule.get("enabled") {
+            Some(TomlValue::Bool(value)) => value,
+            _ => panic!("Expected Bool value for property `schedule.enabled`")
+          };
+          let cron = match schedule.get("cron") {
+            Some(TomlValue::String(value)) => value.to_string(),
+            _ => panic!("Expected String value for property `schedule.cron`")
+          };
+
+          BackupSchedule {
+            enabled: *enabled,
+            cron
+          }
+        },
+        Some(TomlValue::None) | None => BackupSchedule {
+          enabled: false,
+          cron: "0 0 * * *".to_string(),
+        },
         _ => panic!("Expected String or None value for property `schedule`")
       };
       let encryption_key = match properties.get("encryption") {
@@ -132,8 +155,8 @@ impl Config {
         Some(TomlValue::Object(datastore)) => {
           let storage_type = match datastore.get("type") {
             Some(TomlValue::String(value)) => match value.as_str() {
-              "filesystem" => DatastoreType::FileSystem,
-              "s3" => DatastoreType::S3,
+              "filesystem" => BackupDatastoreType::FileSystem,
+              "s3" => BackupDatastoreType::S3,
               _ => panic!("Invalid datastore type")
             },
             _ => panic!("Expected String value for property `datastore.type`")
@@ -143,7 +166,7 @@ impl Config {
             _ => panic!("Expected String value for property `datastore.path`")
           };
 
-          Datastore {
+          BackupDatastore {
             storage_type,
             path
           }
