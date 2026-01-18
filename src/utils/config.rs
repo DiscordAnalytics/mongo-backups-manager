@@ -82,9 +82,9 @@ impl Config {
   fn parse_config (&mut self, config: String) {
     let lines = config.lines();
     let table_regex = Regex::new(r"^\[([\w.]+)]$").unwrap();
-    let mut blocs: HashMap<String, HashMap<String, TomlValue>> = HashMap::new();
-    let mut current_bloc_key = "".to_string();
-    blocs.entry(current_bloc_key.clone()).insert_entry(HashMap::new());
+    let mut blocks: HashMap<String, HashMap<String, TomlValue>> = HashMap::new();
+    let mut current_block_key = "".to_string();
+    blocks.entry(current_block_key.clone()).insert_entry(HashMap::new());
 
     for (index, line) in lines.enumerate() {
       let line = line.trim();
@@ -93,18 +93,18 @@ impl Config {
         let captures = table_regex.captures(line).unwrap().unwrap();
         let backup_name = captures.get(1).map_or("", |m| m.as_str().split(".").last().unwrap());
 
-        blocs.entry(backup_name.to_string()).insert_entry(HashMap::new());
-        current_bloc_key = backup_name.to_string();
+        blocks.entry(backup_name.to_string()).insert_entry(HashMap::new());
+        current_block_key = backup_name.to_string();
       } else {
         let property = match Self::parse_property(line.trim(), index as u16) {
           Ok(value) => value,
           Err(error) => panic!("{}", error),
         };
         println!("{:?}", property);
-        let current_bloc_key = current_bloc_key.clone();
+        let current_bloc_key = current_block_key.clone();
 
         if !matches!(property.value, TomlValue::None) {
-          blocs
+          blocks
             .get_mut(current_bloc_key.as_str())
             .unwrap()
             .entry(property.name)
@@ -113,7 +113,7 @@ impl Config {
       }
     }
 
-    for (backup_name, properties) in blocs.iter() {
+    for (backup_name, properties) in blocks.iter() {
       if backup_name == "" {
         continue
       }
