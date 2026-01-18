@@ -29,7 +29,7 @@ git clone https://github.com/DiscordAnalytics/mongo-backups-manager
 cd mongo-backups-manager
 cargo build
 ```
-Read [CODE_OF_CONDUCT.md](./.github/CODE_OF_CONDUCT.md) and [CONTRIBUTING.md](./.github/CONTRIBUTING.md), create a branch and start coding 😎
+Read [CODE_OF_CONDUCT.md](./.github/CODE_OF_CONDUCT.md) and [./.github/CONTRIBUTING.md](./.github/CONTRIBUTING.md), create a branch and start coding 😎
 ```shell
 git branch feat/super-cool-feature
 git checkout feat/super-cool-feature
