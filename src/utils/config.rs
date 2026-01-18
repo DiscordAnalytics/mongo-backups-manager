@@ -3,8 +3,8 @@ use std::{
   fs::File,
   path::Path,
   io::Read,
+  collections::HashMap,
 };
-use std::collections::HashMap;
 use fancy_regex::Regex;
 
 #[derive(Debug)]

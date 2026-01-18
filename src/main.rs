@@ -2,10 +2,10 @@ use dotenvy::dotenv;
 use crate::{
   utils::{
     logger::Logger,
-    config::Config
+    config::Config,
+    crypto::generate_key,
   },
 };
-use crate::utils::crypto::generate_key;
 
 fn main() {
   dotenv().ok();
