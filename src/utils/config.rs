@@ -29,6 +29,7 @@ struct BackupSchedule {
 struct Backup {
   display_name: String,
   connection_string: String,
+  ignore_collections: Vec<String>,
   store: BackupDatastore,
   schedule: BackupSchedule,
   encryption_key: Option<String>,
@@ -40,6 +41,7 @@ enum TomlValue {
   Int(i32),
   Bool(bool),
   Object(HashMap<String, TomlValue>),
+  Array(Vec<TomlValue>),
   None
 }
 
@@ -173,6 +175,21 @@ impl Config {
         },
         _ => panic!("Expected Object value for property `datastore`")
       };
+      let ignore_collections = match properties.get("ignore_collections") {
+        Some(TomlValue::Array(raw_array)) => {
+          let mut array: Vec<String>= vec![];
+
+          for entry in raw_array {
+            match entry {
+              TomlValue::String(value) => array.push(value.to_string()),
+              _ => panic!("Expected String value for elements of property `ignore_collections`")
+            }
+          }
+
+          array
+        },
+        _ => panic!("Expected Array value for property `ingore_collections`")
+      };
 
       if encryption_key.as_deref().is_some_and(|k| k.len() != 64) {
         panic!("`encryption_key` is invalid. You can use the `mdbmcli generate-key` command to get one.")
@@ -181,6 +198,7 @@ impl Config {
       self.backups.entry(backup_name.clone()).insert_entry(Backup {
         display_name: backup_name,
         connection_string,
+        ignore_collections,
         store: datastore,
         schedule,
         encryption_key,
@@ -222,6 +240,7 @@ impl Config {
     let int_value_regex = Regex::new(r"^[0-9]+$").map_err(|e| e.to_string())?;
     let bool_value_regex = Regex::new(r"^(true)|(false)$").map_err(|e| e.to_string())?;
     let obj_value_regex = Regex::new(r"^\{(.*)\}$").map_err(|e| e.to_string())?;
+    let array_value_regex = Regex::new(r"^\[(.*)\]$").map_err(|e| e.to_string())?;
 
     if string_value_regex.is_match(raw_value).unwrap() {
       let raw_value = string_value_regex.captures(raw_value).unwrap().unwrap();
@@ -245,8 +264,8 @@ impl Config {
       let property_regex = Regex::new(r#"\w+\s*[=:]\s*(?:"[^"]*"|'[^']*'|\d+(?:\.\d+)?|true|false)"#).map_err(|e| e.to_string())?;
       let mut obj_properties: HashMap<String, TomlValue> = HashMap::new();
 
-      for cap in property_regex.find_iter(obj_content) {
-        if let Ok(property) = cap {
+      for res in property_regex.find_iter(obj_content) {
+        if let Ok(property) = res {
           let property = Self::parse_property(property.as_str(), 0);
 
           if property.is_ok() {
@@ -257,8 +276,27 @@ impl Config {
       }
 
       Ok(TomlValue::Object(obj_properties))
+    } else if array_value_regex.is_match(raw_value).unwrap() {
+      let raw_value = array_value_regex.captures(raw_value).unwrap().unwrap();
+      let array_content = raw_value.get(1).map_or("", |m| m.as_str());
+
+      let value_regex = Regex::new(r#"'[^']*'|"(?:\\.|[^"\\])*"|[^,]+"#).map_err(|e| e.to_string())?;
+      let mut array = vec![];
+
+      for res in value_regex.find_iter(array_content) {
+        if let Ok(value) = res {
+          let value = Self::parse_property_value(value.as_str().trim());
+
+          if value.is_ok() {
+            let value = value?;
+            array.push(value);
+          }
+        }
+      }
+
+      Ok(TomlValue::Array(array))
     } else {
-      Err("Invalid property type".to_string())
+      Err("Invalid property value type".to_string())
     }
   }
 }
