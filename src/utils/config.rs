@@ -147,7 +147,12 @@ impl Config {
             }
 
             let parsed = Self::parse_value(value.trim());
-            result.get_mut(&section).unwrap().insert(key, parsed);
+
+            if let Some(section_map) = result.get_mut(&section) {
+                section_map.insert(key, parsed);
+            } else {
+                panic!("Found key '{}' outside of any section in config file", key);
+            }
         }
 
         for (section, values) in result {
