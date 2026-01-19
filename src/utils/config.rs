@@ -70,6 +70,7 @@ impl TomlValue {
     }
 }
 
+#[derive(Debug)]
 enum Frame {
     Array(Vec<TomlValue>),
     Object(HashMap<String, TomlValue>),
@@ -89,16 +90,16 @@ impl Config {
         let config_file = env::var("CONFIG_FILE").unwrap_or("./config.toml".to_string());
 
         let path = Path::new(&config_file);
-        let mut file = match File::open(path) {
-            Ok(file) => file,
-            Err(err) => panic!("Couldn't open config file {}: {}", path.display(), err),
-        };
+        let mut file = File::open(path)
+            .unwrap_or_else(|err| panic!("Couldn't open config file {}: {}", path.display(), err));
 
         let mut content = String::new();
-        let _ = match file.read_to_string(&mut content) {
-            Ok(_) => instance.parse_config(content.clone()),
-            Err(err) => panic!("Couldn't read file {}: {}", path.display(), err),
-        };
+        file.read_to_string(&mut content)
+            .unwrap_or_else(|err| panic!("Couldn't read file {}: {}", path.display(), err));
+
+        instance
+            .parse_config(content)
+            .expect("Failed to parse config file");
 
         instance
     }
@@ -158,12 +159,7 @@ impl Config {
         for (section, values) in result {
             if section.starts_with("backup.") {
                 let backup = Self::parse_backup(&values)?;
-                let key = if !backup.display_name.is_empty() {
-                    backup.display_name.clone()
-                } else {
-                    section.clone()
-                };
-                self.backups.insert(key, backup);
+                self.backups.insert(section, backup);
             }
         }
 
@@ -330,9 +326,21 @@ impl Config {
             }
         }
 
-        match stack.pop().unwrap() {
-            Frame::Array(v) => TomlValue::Array(v),
-            Frame::Object(m) => TomlValue::Object(m),
+        if stack.len() == 1 {
+            match stack.pop().unwrap() {
+                Frame::Array(v) => {
+                    if v.len() == 1 {
+                        v.into_iter().next().unwrap()
+                    } else {
+                        TomlValue::Array(v)
+                    }
+                }
+                Frame::Object(m) => TomlValue::Object(m),
+            }
+        } else if stack.is_empty() {
+            TomlValue::String(text.to_string())
+        } else {
+            panic!("Malformed value parsing: {:?}", stack);
         }
     }
 
