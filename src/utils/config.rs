@@ -106,7 +106,7 @@ impl Config {
 
     fn parse_config(&mut self, config: String) -> Result<(), String> {
         let mut result = HashMap::new();
-        let mut section = String::new();
+        let mut table = String::new();
         let mut i = 0;
 
         let lines: Vec<String> = config.lines().map(|l| l.to_string()).collect();
@@ -120,8 +120,8 @@ impl Config {
             }
 
             if line.starts_with('[') && line.ends_with(']') {
-                section = line[1..line.len() - 1].to_string();
-                result.insert(section.clone(), HashMap::new());
+                table = line[1..line.len() - 1].to_string();
+                result.insert(table.clone(), HashMap::new());
                 continue;
             }
 
@@ -149,17 +149,17 @@ impl Config {
 
             let parsed = Self::parse_value(value.trim());
 
-            if let Some(section_map) = result.get_mut(&section) {
-                section_map.insert(key, parsed);
+            if let Some(table_map) = result.get_mut(&table) {
+                table_map.insert(key, parsed);
             } else {
-                panic!("Found key '{}' outside of any section in config file", key);
+                panic!("Found key '{}' outside of any table in config file", key);
             }
         }
 
-        for (section, values) in result {
-            if section.starts_with("backup.") {
+        for (table, values) in result {
+            if table.starts_with("backup.") {
                 let backup = Self::parse_backup(&values)?;
-                self.backups.insert(section, backup);
+                self.backups.insert(table, backup);
             }
         }
 
