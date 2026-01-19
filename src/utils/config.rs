@@ -138,7 +138,7 @@ impl Config {
 
             while !stack.is_empty() {
                 if i >= lines.len() {
-                    panic!("Unclosed multiline value");
+                    panic!("Unclosed multiline value at line {}", i);
                 }
                 let next = Self::strip_comment(&lines[i]);
                 i += 1;
@@ -152,7 +152,10 @@ impl Config {
             if let Some(table_map) = result.get_mut(&table) {
                 table_map.insert(key, parsed);
             } else {
-                panic!("Found key '{}' outside of any table in config file", key);
+                panic!(
+                    "Found key '{}' outside of any table in config file at line {}",
+                    key, i
+                );
             }
         }
 
