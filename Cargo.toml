@@ -1,13 +1,38 @@
 [package]
-name = "mongo-backups-manager"
+name = "mbm"
 version = "0.1.0"
+authors = ["Nolhan", "ValDesign"]
+description = "A simple tool to automatically create backups from a mongodb server."
 edition = "2024"
+repository = "https://github.com/DiscordAnalytics/mongo-backups-manager"
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "mbm"
+path = "src/main.rs"
 
 [dependencies]
-chacha20poly1305 = { version = "0.10.1", default-features = false, features = ["getrandom", "rand_core"] }
-chrono = { version = "0.4.42", features = [] }
+chacha20poly1305 = { version = "0.10.1", default-features = false, features = [
+  "getrandom",
+] }
+chrono = { version = "0.4.43", default-features = false, features = ["clock"] }
+clap = { version = "4.5.54", default-features = false, features = [
+  "derive",
+  "help",
+  "std",
+  "usage",
+] }
 dotenvy = "0.15.7"
-fancy-regex = { version = "0.17.0", features = [] }
+mongodb = { version = "3.5.0", default-features = false, features = [
+  "bson-3",
+  "compat-3-3-0",
+  "dns-resolver",
+  "rustls-tls",
+] }
+ratatui = { version = "0.30.0", default-features = false, features = [
+  "crossterm",
+] }
+tokio = { version = "1.49.0", features = ["full"] }
 
 [profile.release]
 opt-level = "z"
