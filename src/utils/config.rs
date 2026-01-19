@@ -39,11 +39,37 @@ enum TomlValue {
 }
 
 impl TomlValue {
+    fn type_name(&self) -> &'static str {
+        match self {
+            TomlValue::String(_) => "string",
+            TomlValue::Int(_) => "int",
+            TomlValue::Float(_) => "float",
+            TomlValue::Bool(_) => "bool",
+            TomlValue::Array(_) => "array",
+            TomlValue::Object(_) => "object",
+        }
+    }
+
+    fn debug_value(&self) -> String {
+        match self {
+            TomlValue::String(s) => format!("\"{}\"", s),
+            TomlValue::Int(n) => n.to_string(),
+            TomlValue::Float(f) => f.to_string(),
+            TomlValue::Bool(b) => b.to_string(),
+            TomlValue::Array(_) => "[...]".to_string(),
+            TomlValue::Object(_) => "{...}".to_string(),
+        }
+    }
+
     fn as_string(&self) -> Result<String, String> {
         match self {
             TomlValue::String(s) => Ok(s.clone()),
             TomlValue::Array(v) if v.len() == 1 => v[0].as_string(),
-            _ => Err("Expected string".into()),
+            _ => Err(format!(
+                "Expected string, found {} ({})",
+                self.type_name(),
+                self.debug_value()
+            )),
         }
     }
 
@@ -51,15 +77,24 @@ impl TomlValue {
         match self {
             TomlValue::Int(i) => Ok(*i),
             TomlValue::Array(v) if v.len() == 1 => v[0].as_int(),
-            _ => Err("Expected int".into()),
+            _ => Err(format!(
+                "Expected int, found {} ({})",
+                self.type_name(),
+                self.debug_value()
+            )),
         }
     }
 
     fn as_float(&self) -> Result<f64, String> {
         match self {
             TomlValue::Float(f) => Ok(*f),
+            TomlValue::Int(n) => Ok(*n as f64),
             TomlValue::Array(v) if v.len() == 1 => v[0].as_float(),
-            _ => Err("Expected float".into()),
+            _ => Err(format!(
+                "Expected float, found {} ({})",
+                self.type_name(),
+                self.debug_value()
+            )),
         }
     }
 
@@ -67,22 +102,34 @@ impl TomlValue {
         match self {
             TomlValue::Bool(b) => Ok(*b),
             TomlValue::Array(v) if v.len() == 1 => v[0].as_bool(),
-            _ => Err("Expected bool".into()),
+            _ => Err(format!(
+                "Expected bool, found {} ({})",
+                self.type_name(),
+                self.debug_value()
+            )),
         }
     }
 
     fn as_array(&self) -> Result<&Vec<TomlValue>, String> {
         match self {
             TomlValue::Array(v) => Ok(v),
-            _ => Err("Expected array".into()),
+            _ => Err(format!(
+                "Expected array, found {} ({})",
+                self.type_name(),
+                self.debug_value()
+            )),
         }
     }
 
-    fn as_object(&self) -> Result<&std::collections::HashMap<String, TomlValue>, String> {
+    fn as_object(&self) -> Result<&HashMap<String, TomlValue>, String> {
         match self {
             TomlValue::Object(m) => Ok(m),
             TomlValue::Array(v) if v.len() == 1 => v[0].as_object(),
-            _ => Err("Expected object".into()),
+            _ => Err(format!(
+                "Expected object, found {} ({})",
+                self.type_name(),
+                self.debug_value()
+            )),
         }
     }
 }
