@@ -27,7 +27,7 @@ Then, clone the repo and build the project:
 ```shell
 git clone https://github.com/DiscordAnalytics/mongo-backups-manager
 cd mongo-backups-manager
-cargo build
+cargo build --bin mbm
 ```
 Read [CODE_OF_CONDUCT.md](./.github/CODE_OF_CONDUCT.md) and [./.github/CONTRIBUTING.md](./.github/CONTRIBUTING.md), create a branch and start coding 😎
 ```shell
