@@ -1,25 +1,29 @@
 use dotenvy::dotenv;
+use std::error::Error;
+use clap::Parser;
+
 use crate::{
   utils::{
-    logger::Logger,
     config::Config,
-    crypto::generate_key,
   },
+  cli::{Cli, Commands},
+  ui::app::App
 };
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
   dotenv().ok();
-
-  Logger::info("Hello World!");
-  Logger::highlight("Hello World!");
-  Logger::warn("Hello World!");
-  Logger::error("Hello World!");
-
+  let cli = Cli::parse();
   let config = Config::new();
-  
-  let key = generate_key();
-  
-  println!("{:?}", key);
+
+  match cli.command {
+    None | Some(Commands::Tui) => App::new().run().await?,
+  };
+
+  Ok(())
 }
 
+mod cli;
+mod db;
+mod ui;
 mod utils;
