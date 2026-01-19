@@ -184,7 +184,10 @@ impl Config {
                 .collect::<Result<_, _>>()?,
             datastore: Self::parse_datastore(map.get("datastore").ok_or("missing datastore")?)?,
             schedule: Self::parse_schedule(map.get("schedule").ok_or("missing schedule")?)?,
-            encryption_key: map.get("public_key").map(|v| v.as_string()).transpose()?,
+            encryption_key: map
+                .get("encryption_key")
+                .map(|v| v.as_string())
+                .transpose()?,
         })
     }
 
