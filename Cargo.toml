@@ -23,8 +23,6 @@ clap = { version = "4.5.54", default-features = false, features = [
   "usage",
 ] }
 dotenvy = "0.15.7"
-fancy-regex = "0.17.0"
-futures = "0.3.31"
 mongodb = { version = "3.5.0", default-features = false, features = [
   "bson-3",
   "compat-3-3-0",
