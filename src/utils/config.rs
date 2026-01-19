@@ -32,6 +32,7 @@ struct Backup {
 enum TomlValue {
     String(String),
     Int(i64),
+    Float(f64),
     Bool(bool),
     Object(HashMap<String, TomlValue>),
     Array(Vec<TomlValue>),
@@ -43,6 +44,22 @@ impl TomlValue {
             TomlValue::String(s) => Ok(s.clone()),
             TomlValue::Array(v) if v.len() == 1 => v[0].as_string(),
             _ => Err("Expected string".into()),
+        }
+    }
+
+    fn as_int(&self) -> Result<i64, String> {
+        match self {
+            TomlValue::Int(i) => Ok(*i),
+            TomlValue::Array(v) if v.len() == 1 => v[0].as_int(),
+            _ => Err("Expected int".into()),
+        }
+    }
+
+    fn as_float(&self) -> Result<f64, String> {
+        match self {
+            TomlValue::Float(f) => Ok(*f),
+            TomlValue::Array(v) if v.len() == 1 => v[0].as_float(),
+            _ => Err("Expected float".into()),
         }
     }
 
@@ -316,6 +333,8 @@ impl Config {
                         TomlValue::Bool(false)
                     } else if let Ok(n) = token.parse::<i64>() {
                         TomlValue::Int(n)
+                    } else if let Ok(f) = token.parse::<f64>() {
+                        TomlValue::Float(f)
                     } else {
                         if matches!(stack.last(), Some(Frame::Object(_))) && current_key.is_none() {
                             current_key = Some(token);
