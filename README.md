@@ -29,6 +29,10 @@ git clone https://github.com/DiscordAnalytics/mongo-backups-manager
 cd mongo-backups-manager
 cargo build --bin mbm
 ```
+To run the project
+```shell
+cargo run --bin mbm
+```
 Read [CODE_OF_CONDUCT.md](./.github/CODE_OF_CONDUCT.md) and [./.github/CONTRIBUTING.md](./.github/CONTRIBUTING.md), create a branch and start coding 😎
 ```shell
 git branch feat/super-cool-feature
