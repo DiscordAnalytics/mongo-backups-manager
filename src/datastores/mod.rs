@@ -9,4 +9,5 @@ pub trait Datastore {
   fn get_object(&self, path: String) -> Result<String, String>;
   fn list_objects(&self) -> Result<Vec<String>, String>;
   fn put_object(&self, object_name: &str, object_content: &[u8]) -> Result<(), String>;
+  fn delete_object(&self, object_name: &str) -> Result<(), String>;
 }

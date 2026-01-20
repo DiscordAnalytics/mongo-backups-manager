@@ -1,6 +1,7 @@
+use std::fmt::format;
 use crate::datastores::Datastore;
 use regex::Regex;
-use std::fs::{File, create_dir_all, read_dir};
+use std::fs::{File, create_dir_all, read_dir, remove_file};
 use std::io::{Bytes, Read, Write};
 use std::path::{Path, PathBuf};
 
@@ -66,6 +67,18 @@ impl Datastore for FilesystemDatastore {
     file
       .write(obj_content)
       .map_err(|e| format!("Cannot write file {}: {}", file_path.display(), e))?;
+
+    Ok(())
+  }
+
+  fn delete_object(&self, object_name: &str) -> Result<(), String> {
+    let file_path = self.base_path.join(Path::new(object_name));
+
+    if !file_path.exists() {
+      return Err(format!("File {} does not exists", file_path.display()));
+    }
+
+    let _ = remove_file(file_path.clone()).map_err(|e| format!("Cannot delete file {}: {}", file_path.display(), e))?;
 
     Ok(())
   }
