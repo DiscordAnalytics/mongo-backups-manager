@@ -14,6 +14,7 @@ use ratatui::{
 use crate::{
   db::DatabaseConnection,
   ui::screens::{BackupsScreen, HomeItem, HomeScreen, SettingsScreen},
+  utils::config::Config,
 };
 
 pub enum CurrentScreen {
@@ -26,17 +27,19 @@ pub struct App {
   should_quit: bool,
   current_screen: CurrentScreen,
   pub list_state: ListState,
+  pub config: Config,
   pub database_connection: DatabaseConnection,
 }
 
 impl App {
-  pub fn new() -> Self {
+  pub fn new(config: Config) -> Self {
     let mut list_state = ListState::default();
     list_state.select_first();
     Self {
       should_quit: false,
       current_screen: CurrentScreen::Main,
       list_state,
+      config,
       database_connection: DatabaseConnection::new(),
     }
   }

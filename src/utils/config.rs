@@ -1,31 +1,31 @@
 use std::{collections::HashMap, env, fs::File, io::Read, path::Path};
 
 #[derive(Debug)]
-enum BackupDatastoreType {
+pub enum BackupDatastoreType {
   FileSystem,
   S3,
 }
 
 #[derive(Debug)]
-struct BackupDatastore {
-  storage_type: BackupDatastoreType,
-  path: String,
+pub struct BackupDatastore {
+  pub storage_type: BackupDatastoreType,
+  pub path: String,
 }
 
 #[derive(Debug)]
-struct BackupSchedule {
-  enabled: bool,
-  cron: String,
+pub struct BackupSchedule {
+  pub enabled: bool,
+  pub cron: String,
 }
 
 #[derive(Debug)]
-struct Backup {
-  display_name: String,
-  connection_string: String,
-  ignore_collections: Vec<String>,
-  datastore: BackupDatastore,
-  schedule: BackupSchedule,
-  encryption_key: Option<String>,
+pub struct Backup {
+  pub display_name: String,
+  pub connection_string: String,
+  pub ignore_collections: Vec<String>,
+  pub datastore: BackupDatastore,
+  pub schedule: BackupSchedule,
+  pub encryption_key: Option<String>,
 }
 
 #[derive(Debug)]
@@ -142,7 +142,7 @@ enum Frame {
 
 #[derive(Debug)]
 pub struct Config {
-  backups: HashMap<String, Backup>,
+  pub backups: HashMap<String, Backup>,
 }
 
 impl Config {

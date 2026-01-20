@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
   let config = Config::new();
 
   match cli.command {
-    None | Some(Commands::Tui) => App::new().run().await?,
+    None | Some(Commands::Tui) => App::new(config).run().await?,
   };
 
   Ok(())
