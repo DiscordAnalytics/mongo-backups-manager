@@ -1,10 +1,13 @@
 use crate::datastores::Datastore;
 use regex::Regex;
 use std::{
-  fs::{File, create_dir_all, read_dir, remove_file},
+  fs::{create_dir_all, read_dir, remove_file, File},
   io::{Read, Write},
   path::{Path, PathBuf},
+  sync::OnceLock
 };
+
+static BACKUP_FILE_REGEX: OnceLock<Regex> = OnceLock::new();
 
 pub struct FilesystemDatastore {
   base_path: PathBuf,
@@ -43,7 +46,8 @@ impl Datastore for FilesystemDatastore {
   }
 
   fn list_objects(&self) -> Result<Vec<String>, String> {
-    let backup_file_regex = Regex::new(r"^backup_\w+_[0-9]+\.json$").map_err(|e| e.to_string())?;
+    let backup_file_regex = BACKUP_FILE_REGEX
+      .get_or_init(|| Regex::new(r"^backup_\w+_[0-9]+\.json$").expect("invalid regex"));
     let dir_content = read_dir(self.base_path.clone())
       .map_err(|err| format!("Cannot read read datastore directory content: {}", err))?
       .filter_map(|f| f.ok())
