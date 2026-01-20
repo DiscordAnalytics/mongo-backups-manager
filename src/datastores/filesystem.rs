@@ -2,7 +2,7 @@ use crate::datastores::Datastore;
 use regex::Regex;
 use std::{
   fs::{File, create_dir_all, read_dir, remove_file},
-  io::{Read, Write},
+  io::{ErrorKind, Read, Write},
   path::{Path, PathBuf},
   sync::OnceLock,
 };
@@ -50,10 +50,13 @@ impl Datastore for FilesystemDatastore {
       .get_or_init(|| Regex::new(r"^backup_\w+_[0-9]+\.json$").expect("invalid regex"));
     let dir_content = read_dir(self.base_path.clone())
       .map_err(|err| format!("Cannot read read datastore directory content: {}", err))?
-      .filter_map(|f| f.ok())
-      .filter(|f| f.file_type().is_ok() && f.file_type().unwrap().is_file())
-      .map(|f| f.file_name().to_string_lossy().to_string())
-      .filter(|f| backup_file_regex.is_match(f))
+      .filter_map(Result::ok)
+      .filter_map(|entry| {
+        let name = entry.file_name();
+        let name = name.to_str()?;
+        backup_file_regex.is_match(name).then(|| name.to_string())
+      })
+      .map(|f| f)
       .collect();
 
     Ok(dir_content)
@@ -70,7 +73,7 @@ impl Datastore for FilesystemDatastore {
       .map_err(|e| format!("Cannot create file {}: {}", file_path.display(), e))?;
 
     file
-      .write(obj_content)
+      .write_all(obj_content)
       .map_err(|e| format!("Cannot write file {}: {}", file_path.display(), e))?;
 
     Ok(())
@@ -79,12 +82,13 @@ impl Datastore for FilesystemDatastore {
   fn delete_object(&self, object_name: &str) -> Result<(), String> {
     let file_path = self.base_path.join(Path::new(object_name));
 
-    if !file_path.exists() {
-      return Err(format!("File {} does not exists", file_path.display()));
-    }
-
-    let _ = remove_file(file_path.clone())
-      .map_err(|e| format!("Cannot delete file {}: {}", file_path.display(), e))?;
+    let _ = remove_file(file_path.clone()).map_err(|e| {
+      if e.kind() == ErrorKind::NotFound {
+        format!("File {} does not exist", file_path.display())
+      } else {
+        format!("Cannot delete file {}: {}", file_path.display(), e)
+      }
+    })?;
 
     Ok(())
   }
