@@ -33,6 +33,7 @@ ratatui = { version = "0.30.0", default-features = false, features = [
   "crossterm",
 ] }
 tokio = { version = "1.49.0", features = ["full"] }
+regex = "1.12.2"
 
 [profile.release]
 opt-level = "z"
