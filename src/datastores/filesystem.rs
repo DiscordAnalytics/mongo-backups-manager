@@ -1,7 +1,7 @@
 use crate::datastores::Datastore;
 use regex::Regex;
 use std::fs::{File, create_dir_all, read_dir};
-use std::io::{Bytes, Read};
+use std::io::{Bytes, Read, Write};
 use std::path::{Path, PathBuf};
 
 pub struct FilesystemDatastore {
@@ -53,7 +53,20 @@ impl Datastore for FilesystemDatastore {
     Ok(dir_content)
   }
 
-  fn put_object(path: &str, content: Vec<Bytes<u8>>) -> Result<(), String> {
-    todo!()
+  fn put_object(&self, object_name: &str, obj_content: &[u8]) -> Result<(), String> {
+    let file_path = self.base_path.join(Path::new(object_name));
+
+    if file_path.exists() {
+      return Err(format!("File {} already exists", file_path.display()));
+    }
+
+    let mut file = File::create(file_path.clone())
+      .map_err(|e| format!("Cannot create file {}: {}", file_path.display(), e))?;
+
+    file
+      .write(obj_content)
+      .map_err(|e| format!("Cannot write file {}: {}", file_path.display(), e))?;
+
+    Ok(())
   }
 }
