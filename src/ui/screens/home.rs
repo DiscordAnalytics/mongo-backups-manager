@@ -14,7 +14,7 @@ use crate::ui::{
 };
 
 pub enum HomeItem {
-  Databases,
+  Backups,
   Settings,
   Exit,
 }
@@ -22,7 +22,7 @@ pub enum HomeItem {
 impl From<&HomeItem> for ListItem<'_> {
   fn from(value: &HomeItem) -> Self {
     let line = Line::from(match value {
-      HomeItem::Databases => "Databases",
+      HomeItem::Backups => "Backups",
       HomeItem::Settings => "Settings",
       HomeItem::Exit => "Exit",
     })
@@ -56,7 +56,7 @@ impl HomeScreen {
   }
 
   pub fn list_items() -> &'static [HomeItem] {
-    static ITEMS: [HomeItem; 3] = [HomeItem::Databases, HomeItem::Settings, HomeItem::Exit];
+    static ITEMS: [HomeItem; 3] = [HomeItem::Backups, HomeItem::Settings, HomeItem::Exit];
     &ITEMS
   }
 }

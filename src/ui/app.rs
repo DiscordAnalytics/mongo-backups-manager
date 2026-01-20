@@ -13,12 +13,12 @@ use ratatui::{
 
 use crate::{
   db::DatabaseConnection,
-  ui::screens::{DatabasesScreen, HomeItem, HomeScreen, SettingsScreen},
+  ui::screens::{BackupsScreen, HomeItem, HomeScreen, SettingsScreen},
 };
 
 pub enum CurrentScreen {
   Main,
-  Databases,
+  Backups,
   Settings,
 }
 
@@ -56,8 +56,8 @@ impl App {
             eprintln!("Draw error: {}", e);
           }
         }
-        CurrentScreen::Databases => {
-          if let Err(e) = DatabasesScreen::draw(self, frame) {
+        CurrentScreen::Backups => {
+          if let Err(e) = BackupsScreen::draw(self, frame) {
             eprintln!("Draw error: {}", e);
           }
         }
@@ -101,7 +101,7 @@ impl App {
         let items = HomeScreen::list_items();
         if let Some(idx) = self.list_state.selected() {
           match items[idx] {
-            HomeItem::Databases => self.set_screen(CurrentScreen::Databases),
+            HomeItem::Backups => self.set_screen(CurrentScreen::Backups),
             HomeItem::Settings => self.set_screen(CurrentScreen::Settings),
             HomeItem::Exit => self.should_quit = true,
           }
