@@ -1,9 +1,10 @@
-use std::fmt::format;
 use crate::datastores::Datastore;
 use regex::Regex;
-use std::fs::{File, create_dir_all, read_dir, remove_file};
-use std::io::{Bytes, Read, Write};
-use std::path::{Path, PathBuf};
+use std::{
+  fs::{File, create_dir_all, read_dir, remove_file},
+  io::{Read, Write},
+  path::{Path, PathBuf},
+};
 
 pub struct FilesystemDatastore {
   base_path: PathBuf,
@@ -78,7 +79,8 @@ impl Datastore for FilesystemDatastore {
       return Err(format!("File {} does not exists", file_path.display()));
     }
 
-    let _ = remove_file(file_path.clone()).map_err(|e| format!("Cannot delete file {}: {}", file_path.display(), e))?;
+    let _ = remove_file(file_path.clone())
+      .map_err(|e| format!("Cannot delete file {}: {}", file_path.display(), e))?;
 
     Ok(())
   }
