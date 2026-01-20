@@ -10,6 +10,7 @@ use crate::{
 };
 
 mod cli;
+mod datastores;
 mod db;
 mod ui;
 mod utils;
