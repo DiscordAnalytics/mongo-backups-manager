@@ -1,10 +1,10 @@
 use crate::datastores::Datastore;
 use regex::Regex;
 use std::{
-  fs::{create_dir_all, read_dir, remove_file, File},
+  fs::{File, create_dir_all, read_dir, remove_file},
   io::{Read, Write},
   path::{Path, PathBuf},
-  sync::OnceLock
+  sync::OnceLock,
 };
 
 static BACKUP_FILE_REGEX: OnceLock<Regex> = OnceLock::new();
