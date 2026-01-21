@@ -35,7 +35,7 @@ pub struct HomeScreen;
 
 impl HomeScreen {
   pub fn draw(app: &mut App, frame: &mut Frame) -> Result<()> {
-    ScreenLayout::draw(frame, None);
+    ScreenLayout::draw(app, frame, None);
 
     let area = frame.area();
 

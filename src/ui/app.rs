@@ -17,6 +17,7 @@ use crate::{
   utils::config::Config,
 };
 
+#[derive(PartialEq)]
 pub enum CurrentScreen {
   Main,
   Backups,
@@ -25,7 +26,7 @@ pub enum CurrentScreen {
 
 pub struct App {
   should_quit: bool,
-  current_screen: CurrentScreen,
+  pub current_screen: CurrentScreen,
   pub list_state: ListState,
   pub config: Config,
   pub database_connection: DatabaseConnection,
@@ -98,8 +99,12 @@ impl App {
     }
 
     match (&self.current_screen, key.code) {
-      (CurrentScreen::Main, KeyCode::Down) => self.list_state.select_next(),
-      (CurrentScreen::Main, KeyCode::Up) => self.list_state.select_previous(),
+      (CurrentScreen::Main | CurrentScreen::Backups, KeyCode::Down) => {
+        self.list_state.select_next()
+      }
+      (CurrentScreen::Main | CurrentScreen::Backups, KeyCode::Up) => {
+        self.list_state.select_previous()
+      }
       (CurrentScreen::Main, KeyCode::Enter) => {
         let items = HomeScreen::list_items();
         if let Some(idx) = self.list_state.selected() {
@@ -109,6 +114,9 @@ impl App {
             HomeItem::Exit => self.should_quit = true,
           }
         }
+      }
+      (CurrentScreen::Backups | CurrentScreen::Settings, KeyCode::Backspace) => {
+        self.set_screen(CurrentScreen::Main)
       }
       (_, KeyCode::Char('q') | KeyCode::Esc) => self.should_quit = true,
       _ => {}
