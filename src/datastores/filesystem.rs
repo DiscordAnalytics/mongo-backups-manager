@@ -28,6 +28,10 @@ impl Datastore for FilesystemDatastore {
         .map_err(|err| panic!("Cannot create datastore base directory: {}", err));
     }
 
+    if !instance.base_path.is_dir() {
+      panic!("Datastore is not a directory")
+    }
+
     instance
   }
 
