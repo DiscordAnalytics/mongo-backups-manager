@@ -13,30 +13,34 @@ use ratatui::{
 
 use crate::{
   db::DatabaseConnection,
-  ui::screens::{DatabasesScreen, HomeItem, HomeScreen, SettingsScreen},
+  ui::screens::{BackupsScreen, HomeItem, HomeScreen, SettingsScreen},
+  utils::config::Config,
 };
 
+#[derive(PartialEq)]
 pub enum CurrentScreen {
   Main,
-  Databases,
+  Backups,
   Settings,
 }
 
 pub struct App {
   should_quit: bool,
-  current_screen: CurrentScreen,
+  pub current_screen: CurrentScreen,
   pub list_state: ListState,
+  pub config: Config,
   pub database_connection: DatabaseConnection,
 }
 
 impl App {
-  pub fn new() -> Self {
+  pub fn new(config: Config) -> Self {
     let mut list_state = ListState::default();
     list_state.select_first();
     Self {
       should_quit: false,
       current_screen: CurrentScreen::Main,
       list_state,
+      config,
       database_connection: DatabaseConnection::new(),
     }
   }
@@ -56,8 +60,8 @@ impl App {
             eprintln!("Draw error: {}", e);
           }
         }
-        CurrentScreen::Databases => {
-          if let Err(e) = DatabasesScreen::draw(self, frame) {
+        CurrentScreen::Backups => {
+          if let Err(e) = BackupsScreen::draw(self, frame) {
             eprintln!("Draw error: {}", e);
           }
         }
@@ -95,17 +99,24 @@ impl App {
     }
 
     match (&self.current_screen, key.code) {
-      (CurrentScreen::Main, KeyCode::Down) => self.list_state.select_next(),
-      (CurrentScreen::Main, KeyCode::Up) => self.list_state.select_previous(),
+      (CurrentScreen::Main | CurrentScreen::Backups, KeyCode::Down) => {
+        self.list_state.select_next()
+      }
+      (CurrentScreen::Main | CurrentScreen::Backups, KeyCode::Up) => {
+        self.list_state.select_previous()
+      }
       (CurrentScreen::Main, KeyCode::Enter) => {
         let items = HomeScreen::list_items();
         if let Some(idx) = self.list_state.selected() {
           match items[idx] {
-            HomeItem::Databases => self.set_screen(CurrentScreen::Databases),
+            HomeItem::Backups => self.set_screen(CurrentScreen::Backups),
             HomeItem::Settings => self.set_screen(CurrentScreen::Settings),
             HomeItem::Exit => self.should_quit = true,
           }
         }
+      }
+      (CurrentScreen::Backups | CurrentScreen::Settings, KeyCode::Backspace) => {
+        self.set_screen(CurrentScreen::Main)
       }
       (_, KeyCode::Char('q') | KeyCode::Esc) => self.should_quit = true,
       _ => {}

@@ -8,7 +8,7 @@ pub struct SettingsScreen;
 
 impl SettingsScreen {
   pub fn draw(app: &mut App, frame: &mut Frame) -> Result<()> {
-    ScreenLayout::draw(frame, Some("Settings"));
+    ScreenLayout::draw(app, frame, Some("Settings"));
 
     Ok(())
   }
