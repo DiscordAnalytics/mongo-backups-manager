@@ -431,7 +431,9 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
-  use crate::utils::config::{Backup, BackupDatastore, BackupDatastoreType, BackupSchedule, Config};
+  use crate::utils::config::{
+    Backup, BackupDatastore, BackupDatastoreType, BackupSchedule, Config,
+  };
   use std::collections::HashMap;
   use std::fs::write;
 
@@ -455,20 +457,22 @@ encryption_key = "poiuytreza""#;
     let _ = write("./config.toml", CONFIG_1);
     let config = Config::new();
     let mut expected_backups: HashMap<String, Backup> = HashMap::new();
-    expected_backups.entry("backup.cool".to_string()).insert_entry(Backup {
-      display_name: String::from("Cool Backup"),
-      connection_string: String::from("mongodb://root:password@mongodb.example.com/database"),
-      ignore_collections: Vec::from([String::from("GlobalStats")]),
-      datastore: BackupDatastore {
-        path: String::from("/data/mongo-backups"),
-        storage_type: BackupDatastoreType::FileSystem
-      },
-      schedule: BackupSchedule {
-        enabled: true,
-        cron: String::from("0 0 * * *")
-      },
-      encryption_key: Some(String::from("azertyuiop"))
-    });
+    expected_backups
+      .entry("backup.cool".to_string())
+      .insert_entry(Backup {
+        display_name: String::from("Cool Backup"),
+        connection_string: String::from("mongodb://root:password@mongodb.example.com/database"),
+        ignore_collections: Vec::from([String::from("GlobalStats")]),
+        datastore: BackupDatastore {
+          path: String::from("/data/mongo-backups"),
+          storage_type: BackupDatastoreType::FileSystem,
+        },
+        schedule: BackupSchedule {
+          enabled: true,
+          cron: String::from("0 0 * * *"),
+        },
+        encryption_key: Some(String::from("azertyuiop")),
+      });
 
     for (key, _) in expected_backups.iter() {
       assert_eq!(config.backups.get(key), expected_backups.get(key))
@@ -480,34 +484,38 @@ encryption_key = "poiuytreza""#;
     let _ = write("./config.toml", format!("{CONFIG_1}\n\n{CONFIG_2}"));
     let config = Config::new();
     let mut expected_backups: HashMap<String, Backup> = HashMap::new();
-    expected_backups.entry("backup.cool".to_string()).insert_entry(Backup {
-      display_name: String::from("Cool Backup"),
-      connection_string: String::from("mongodb://root:password@mongodb.example.com/database"),
-      ignore_collections: Vec::from([String::from("GlobalStats")]),
-      datastore: BackupDatastore {
-        path: String::from("/data/mongo-backups"),
-        storage_type: BackupDatastoreType::FileSystem
-      },
-      schedule: BackupSchedule {
-        enabled: true,
-        cron: String::from("0 0 * * *")
-      },
-      encryption_key: Some(String::from("azertyuiop"))
-    });
-    expected_backups.entry("backup.awesome".to_string()).insert_entry(Backup {
-      display_name: String::from("Awesome Backup"),
-      connection_string: String::from("mongodb://root:password@mongodb.awesome.com/database"),
-      ignore_collections: Vec::from([String::from("Collection123")]),
-      datastore: BackupDatastore {
-        path: String::from("/backups-dir"),
-        storage_type: BackupDatastoreType::S3
-      },
-      schedule: BackupSchedule {
-        enabled: true,
-        cron: String::from("0 */5 * * *")
-      },
-      encryption_key: Some(String::from("poiuytreza"))
-    });
+    expected_backups
+      .entry("backup.cool".to_string())
+      .insert_entry(Backup {
+        display_name: String::from("Cool Backup"),
+        connection_string: String::from("mongodb://root:password@mongodb.example.com/database"),
+        ignore_collections: Vec::from([String::from("GlobalStats")]),
+        datastore: BackupDatastore {
+          path: String::from("/data/mongo-backups"),
+          storage_type: BackupDatastoreType::FileSystem,
+        },
+        schedule: BackupSchedule {
+          enabled: true,
+          cron: String::from("0 0 * * *"),
+        },
+        encryption_key: Some(String::from("azertyuiop")),
+      });
+    expected_backups
+      .entry("backup.awesome".to_string())
+      .insert_entry(Backup {
+        display_name: String::from("Awesome Backup"),
+        connection_string: String::from("mongodb://root:password@mongodb.awesome.com/database"),
+        ignore_collections: Vec::from([String::from("Collection123")]),
+        datastore: BackupDatastore {
+          path: String::from("/backups-dir"),
+          storage_type: BackupDatastoreType::S3,
+        },
+        schedule: BackupSchedule {
+          enabled: true,
+          cron: String::from("0 */5 * * *"),
+        },
+        encryption_key: Some(String::from("poiuytreza")),
+      });
 
     for (key, _) in expected_backups.iter() {
       assert_eq!(config.backups.get(key), expected_backups.get(key))

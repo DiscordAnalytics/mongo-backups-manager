@@ -1,7 +1,7 @@
 use crate::datastores::Datastore;
 use regex::Regex;
 use std::{
-  fs::{create_dir_all, read_dir, remove_file, File},
+  fs::{File, create_dir_all, read_dir, remove_file},
   io::{ErrorKind, Read, Write},
   path::{Path, PathBuf},
   sync::OnceLock,
@@ -98,7 +98,7 @@ impl Datastore for FilesystemDatastore {
 mod tests {
   use crate::{
     datastores::{Datastore, FilesystemDatastore},
-    tests::{clean_test_dir, get_test_dir_path}
+    tests::{clean_test_dir, get_test_dir_path},
   };
   use chrono::Timelike;
   use std::fs::{create_dir_all, write};
