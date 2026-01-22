@@ -96,21 +96,15 @@ impl Datastore for FilesystemDatastore {
 
 #[cfg(test)]
 mod tests {
-  use crate::datastores::{Datastore, FilesystemDatastore};
+  use crate::{
+    datastores::{Datastore, FilesystemDatastore},
+    tests::{clean_test_dir, get_test_dir_path}
+  };
   use chrono::Timelike;
-  use std::fs::{create_dir_all, remove_dir_all, write};
-  use std::path::PathBuf;
-
-  fn get_test_dir_path (test_name: &str) -> String {
-    PathBuf::from(format!("/tmp/mbm_tests_{test_name}").as_str()).display().to_string()
-  }
-
-  fn clean_test_dir (path: String) {
-    let _ = remove_dir_all(path).unwrap_or(());
-  }
+  use std::fs::{create_dir_all, write};
 
   #[test]
-  fn fs_datastore_no_dir_initialization () {
+  fn fs_datastore_no_dir_initialization() {
     let test_dir_path = get_test_dir_path("fs_datastore_no_dir_initialization");
     clean_test_dir(test_dir_path.clone());
 
@@ -123,7 +117,7 @@ mod tests {
 
   #[test]
   #[should_panic]
-  fn fs_datastore_file_initialization () {
+  fn fs_datastore_file_initialization() {
     let test_dir_path = get_test_dir_path("fs_datastore_file_initialization");
     let dump_file_path = format!("{}/test.txt", test_dir_path.clone());
     clean_test_dir(test_dir_path.clone());
@@ -136,7 +130,7 @@ mod tests {
   }
 
   #[test]
-  fn fs_datastore_put_in_dev_dir () {
+  fn fs_datastore_put_in_dev_dir() {
     let datastore = FilesystemDatastore::new("/dev");
     let res = datastore.put_object("test.txt", &[0]);
 
@@ -144,7 +138,7 @@ mod tests {
   }
 
   #[test]
-  fn fs_datastore_put_existing_object () {
+  fn fs_datastore_put_existing_object() {
     let test_dir_path = get_test_dir_path("fs_datastore_put_existing_object");
     clean_test_dir(test_dir_path.clone());
 
@@ -158,7 +152,7 @@ mod tests {
   }
 
   #[test]
-  fn fs_datastore_put_object () {
+  fn fs_datastore_put_object() {
     let test_dir_path = get_test_dir_path("fs_datastore_put_object");
     clean_test_dir(test_dir_path.clone());
 
@@ -172,7 +166,7 @@ mod tests {
   }
 
   #[test]
-  fn fs_datastore_get_object () {
+  fn fs_datastore_get_object() {
     let test_dir_path = get_test_dir_path("fs_datastore_get_object");
     clean_test_dir(test_dir_path.clone());
 
@@ -189,7 +183,7 @@ mod tests {
   }
 
   #[test]
-  fn fs_datastore_get_unknown_object () {
+  fn fs_datastore_get_unknown_object() {
     let test_dir_path = get_test_dir_path("fs_datastore_get_unknown_object");
     clean_test_dir(test_dir_path.clone());
     let datastore = FilesystemDatastore::new(test_dir_path.as_str());
@@ -201,7 +195,7 @@ mod tests {
   }
 
   #[test]
-  fn fs_datastore_get_dir () {
+  fn fs_datastore_get_dir() {
     let test_dir_path = get_test_dir_path("fs_datastore_get_dir");
     clean_test_dir(test_dir_path.clone());
     let datastore = FilesystemDatastore::new(test_dir_path.as_str());
@@ -213,7 +207,7 @@ mod tests {
   }
 
   #[test]
-  fn fs_datastore_list_objects () {
+  fn fs_datastore_list_objects() {
     let test_dir_path = get_test_dir_path("fs_datastore_list_objects");
     clean_test_dir(test_dir_path.clone());
     let datastore = FilesystemDatastore::new(test_dir_path.as_str());
@@ -230,8 +224,6 @@ mod tests {
     assert!(res.is_ok());
     let res = res.unwrap();
 
-    println!("{:?} {:?}", files, res);
-
     for i in 0..3 {
       assert!(res.contains(&format!("backup_cool_{}.json", files[i])));
     }
@@ -240,7 +232,7 @@ mod tests {
   }
 
   #[test]
-  fn fs_datastore_list_unknown_objects () {
+  fn fs_datastore_list_unknown_objects() {
     let test_dir_path = get_test_dir_path("fs_datastore_list_unknown_objects");
     clean_test_dir(test_dir_path.clone());
     let datastore = FilesystemDatastore::new(test_dir_path.as_str());
@@ -263,7 +255,7 @@ mod tests {
   }
 
   #[test]
-  fn fs_datastore_delete_object () {
+  fn fs_datastore_delete_object() {
     let test_dir_path = get_test_dir_path("fs_datastore_delete_object");
     clean_test_dir(test_dir_path.clone());
     let datastore = FilesystemDatastore::new(test_dir_path.as_str());
@@ -277,7 +269,7 @@ mod tests {
   }
 
   #[test]
-  fn fs_datastore_delete_unknown_object () {
+  fn fs_datastore_delete_unknown_object() {
     let test_dir_path = get_test_dir_path("fs_datastore_delete_unknown_object");
     clean_test_dir(test_dir_path.clone());
     let datastore = FilesystemDatastore::new(test_dir_path.as_str());
