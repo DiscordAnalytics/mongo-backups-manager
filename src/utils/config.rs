@@ -435,7 +435,7 @@ mod tests {
     Backup, BackupDatastore, BackupDatastoreType, BackupSchedule, Config,
   };
   use std::collections::HashMap;
-  use std::fs::write;
+  use std::fs::{remove_file, write};
 
   const CONFIG_1: &str = r#"[backup.cool]
 display_name = "Cool Backup"
@@ -525,6 +525,7 @@ encryption_key = "poiuytreza""#;
   #[test]
   #[should_panic]
   fn config_parse_config_unknown_file() {
+    let _ = remove_file("./config.toml");
     let _ = Config::new();
   }
 }
