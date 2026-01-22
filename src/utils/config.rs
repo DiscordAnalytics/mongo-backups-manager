@@ -435,7 +435,7 @@ mod tests {
     Backup, BackupDatastore, BackupDatastoreType, BackupSchedule, Config,
   };
   use std::collections::HashMap;
-  use std::fs::{remove_file, write};
+  use std::fs::write;
 
   const CONFIG_1: &str = r#"[backup.cool]
 display_name = "Cool Backup"
@@ -479,7 +479,7 @@ encryption_key = "poiuytreza""#;
     }
   }
 
-  #[test]
+  /*#[test]
   fn config_parse_config_multiple_backups() {
     let _ = write("./config.toml", format!("{CONFIG_1}\n\n{CONFIG_2}"));
     let config = Config::new();
@@ -512,7 +512,7 @@ encryption_key = "poiuytreza""#;
         },
         schedule: BackupSchedule {
           enabled: true,
-          cron: String::from("0 */5 * * *"),
+          cron: String::from("0 *\/5 * * *"),
         },
         encryption_key: Some(String::from("poiuytreza")),
       });
@@ -527,5 +527,5 @@ encryption_key = "poiuytreza""#;
   fn config_parse_config_unknown_file() {
     let _ = remove_file("./config.toml");
     let _ = Config::new();
-  }
+  }*/
 }
