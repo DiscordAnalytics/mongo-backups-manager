@@ -434,8 +434,7 @@ mod tests {
   use crate::utils::config::{
     Backup, BackupDatastore, BackupDatastoreType, BackupSchedule, Config,
   };
-  use std::collections::HashMap;
-  use std::fs::write;
+  use std::{collections::HashMap, fs::write};
 
   const CONFIG_1: &str = r#"[backup.cool]
 display_name = "Cool Backup"

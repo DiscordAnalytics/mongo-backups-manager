@@ -30,8 +30,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 #[cfg(test)]
 pub mod tests {
-  use std::fs::remove_dir_all;
-  use std::path::PathBuf;
+  use std::{fs::remove_dir_all, path::PathBuf};
 
   pub fn get_test_dir_path(test_name: &str) -> String {
     PathBuf::from(format!("/tmp/mbm_tests_{test_name}").as_str())
