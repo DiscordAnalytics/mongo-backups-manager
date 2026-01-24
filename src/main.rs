@@ -1,7 +1,6 @@
-use std::error::Error;
-
 use clap::Parser;
 use dotenvy::dotenv;
+use std::error::Error;
 
 use crate::{
   cli::{Cli, Commands},

@@ -1,4 +1,3 @@
-use crate::datastores::Datastore;
 use regex::Regex;
 use std::{
   fs::{File, create_dir_all, read_dir, remove_file},
@@ -6,6 +5,8 @@ use std::{
   path::{Path, PathBuf},
   sync::OnceLock,
 };
+
+use crate::datastores::Datastore;
 
 static BACKUP_FILE_REGEX: OnceLock<Regex> = OnceLock::new();
 
@@ -96,12 +97,13 @@ impl Datastore for FilesystemDatastore {
 
 #[cfg(test)]
 mod tests {
+  use chrono::Timelike;
+  use std::fs::{create_dir_all, write};
+
   use crate::{
     datastores::{Datastore, FilesystemDatastore},
     tests::{clean_test_dir, get_test_dir_path},
   };
-  use chrono::Timelike;
-  use std::fs::{create_dir_all, write};
 
   #[test]
   fn fs_datastore_no_dir_initialization() {

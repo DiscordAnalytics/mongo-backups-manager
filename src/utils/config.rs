@@ -431,10 +431,11 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
+  use std::{collections::HashMap, fs::write};
+
   use crate::utils::config::{
     Backup, BackupDatastore, BackupDatastoreType, BackupSchedule, Config,
   };
-  use std::{collections::HashMap, fs::write};
 
   const CONFIG_1: &str = r#"[backup.cool]
 display_name = "Cool Backup"
