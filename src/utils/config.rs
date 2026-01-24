@@ -1,24 +1,24 @@
 use std::{collections::HashMap, env, fs::File, io::Read, path::Path};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum BackupDatastoreType {
   FileSystem,
   S3,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct BackupDatastore {
   storage_type: BackupDatastoreType,
   path: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct BackupSchedule {
   enabled: bool,
   cron: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct Backup {
   display_name: String,
   connection_string: String,
@@ -427,4 +427,105 @@ impl Config {
       stack.push(Frame::Array(vec![value]));
     }
   }
+}
+
+#[cfg(test)]
+mod tests {
+  use std::{collections::HashMap, fs::write};
+
+  use crate::utils::config::{
+    Backup, BackupDatastore, BackupDatastoreType, BackupSchedule, Config,
+  };
+
+  const CONFIG_1: &str = r#"[backup.cool]
+display_name = "Cool Backup"
+connection_string = "mongodb://root:password@mongodb.example.com/database"
+ignore_collections = [ "GlobalStats" ]
+datastore = { type = "filesystem", path = "/data/mongo-backups" }
+schedule = { enabled = true, cron = "0 0 * * *" }
+encryption_key = "azertyuiop""#;
+  const CONFIG_2: &str = r#"[backup.awesome]
+display_name = "Awesome Backup"
+connection_string = "mongodb://root:password@mongodb.awesome.com/database"
+ignore_collections = [ "Collection123" ]
+datastore = { type = "s3", path = "/backups-dir" }
+schedule = { enabled = true, cron = "0 */5 * * *" }
+encryption_key = "poiuytreza""#;
+
+  #[test]
+  fn config_parse_config() {
+    let _ = write("./config.toml", CONFIG_1);
+    let config = Config::new();
+    let mut expected_backups: HashMap<String, Backup> = HashMap::new();
+    expected_backups
+      .entry("backup.cool".to_string())
+      .insert_entry(Backup {
+        display_name: String::from("Cool Backup"),
+        connection_string: String::from("mongodb://root:password@mongodb.example.com/database"),
+        ignore_collections: Vec::from([String::from("GlobalStats")]),
+        datastore: BackupDatastore {
+          path: String::from("/data/mongo-backups"),
+          storage_type: BackupDatastoreType::FileSystem,
+        },
+        schedule: BackupSchedule {
+          enabled: true,
+          cron: String::from("0 0 * * *"),
+        },
+        encryption_key: Some(String::from("azertyuiop")),
+      });
+
+    for (key, _) in expected_backups.iter() {
+      assert_eq!(config.backups.get(key), expected_backups.get(key))
+    }
+  }
+
+  /*#[test]
+  fn config_parse_config_multiple_backups() {
+    let _ = write("./config.toml", format!("{CONFIG_1}\n\n{CONFIG_2}"));
+    let config = Config::new();
+    let mut expected_backups: HashMap<String, Backup> = HashMap::new();
+    expected_backups
+      .entry("backup.cool".to_string())
+      .insert_entry(Backup {
+        display_name: String::from("Cool Backup"),
+        connection_string: String::from("mongodb://root:password@mongodb.example.com/database"),
+        ignore_collections: Vec::from([String::from("GlobalStats")]),
+        datastore: BackupDatastore {
+          path: String::from("/data/mongo-backups"),
+          storage_type: BackupDatastoreType::FileSystem,
+        },
+        schedule: BackupSchedule {
+          enabled: true,
+          cron: String::from("0 0 * * *"),
+        },
+        encryption_key: Some(String::from("azertyuiop")),
+      });
+    expected_backups
+      .entry("backup.awesome".to_string())
+      .insert_entry(Backup {
+        display_name: String::from("Awesome Backup"),
+        connection_string: String::from("mongodb://root:password@mongodb.awesome.com/database"),
+        ignore_collections: Vec::from([String::from("Collection123")]),
+        datastore: BackupDatastore {
+          path: String::from("/backups-dir"),
+          storage_type: BackupDatastoreType::S3,
+        },
+        schedule: BackupSchedule {
+          enabled: true,
+          cron: String::from("0 *\/5 * * *"),
+        },
+        encryption_key: Some(String::from("poiuytreza")),
+      });
+
+    for (key, _) in expected_backups.iter() {
+      assert_eq!(config.backups.get(key), expected_backups.get(key))
+    }
+  }
+
+  #[test]
+  #[should_panic]
+  fn config_parse_config_unknown_file() {
+    let _ = remove_file("./config.toml");
+    let _ = Config::new();
+  }*/
 }

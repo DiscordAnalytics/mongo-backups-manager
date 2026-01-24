@@ -2,18 +2,16 @@ name: CI
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize]
+    types: [opened, reopened, synchronize, ready_for_review]
   workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  RUSTFLAGS: "-Dwarnings"
-
 jobs:
   clippy_check:
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -22,14 +20,19 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Run Clippy
         run: cargo clippy --all-targets --all-features
+        env:
+          RUSTFLAGS: "-Dwarnings"
 
   unused_deps:
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
       - name: Check for unused crates
         uses: bnjbvr/cargo-machete@main
+        env:
+          RUSTFLAGS: "-Dwarnings"
 
   rustfmt:
     runs-on: ubuntu-latest
@@ -40,8 +43,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Run Rustfmt
         run: cargo fmt --check
+        env:
+          RUSTFLAGS: "-Dwarnings"
 
   cargo_check:
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -50,3 +56,16 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Run Cargo Check
         run: cargo check
+        env:
+          RUSTFLAGS: "-Dwarnings"
+
+  cargo_tests:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install rust stable toolchain
+        run: rustup update stable && rustup default stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run Cargo Test
+        run: cargo test
