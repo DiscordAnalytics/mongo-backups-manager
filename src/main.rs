@@ -4,9 +4,8 @@ use clap::Parser;
 use dotenvy::dotenv;
 
 use crate::{
-  cli::{Cli, Commands},
+  cli::{Cli, Commands, commands::Daemon},
   ui::app::App,
-  utils::config::Config,
 };
 
 mod cli;
@@ -19,9 +18,9 @@ mod utils;
 async fn main() -> Result<(), Box<dyn Error>> {
   dotenv().ok();
   let cli = Cli::parse();
-  let config = Config::new();
 
   match cli.command {
+    Some(Commands::Daemon) => Daemon::start().await,
     None | Some(Commands::Tui) => App::new().run().await?,
   };
 
