@@ -1,15 +1,15 @@
 use std::{collections::HashMap, env, fs::File, io::Read, path::Path};
 
 #[derive(Debug, PartialEq, Clone)]
-enum BackupDatastoreType {
+pub enum BackupDatastoreType {
   FileSystem,
   S3,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-struct BackupDatastore {
-  storage_type: BackupDatastoreType,
-  path: String,
+pub struct BackupDatastore {
+  pub storage_type: BackupDatastoreType,
+  pub(crate) path: String,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -22,6 +22,7 @@ pub struct BackupSchedule {
 pub struct Backup {
   pub display_name: String,
   pub connection_string: String,
+  pub database_name: String,
   pub ignore_collections: Vec<String>,
   pub datastore: BackupDatastore,
   pub schedule: BackupSchedule,
@@ -244,6 +245,10 @@ impl Config {
         .get("connection_string")
         .ok_or("missing connection_string")?
         .as_string()?,
+      database_name: map
+        .get("database_name")
+        .ok_or("missing database_name")?
+        .as_string()?,
       ignore_collections: map
         .get("ignore_collections")
         .ok_or("missing ignore_collections")?
@@ -432,21 +437,23 @@ impl Config {
 #[cfg(test)]
 mod tests {
   use std::{collections::HashMap, fs::write};
-
+  use clap::builder::Str;
   use crate::utils::config::{
     Backup, BackupDatastore, BackupDatastoreType, BackupSchedule, Config,
   };
 
   const CONFIG_1: &str = r#"[backup.cool]
 display_name = "Cool Backup"
-connection_string = "mongodb://root:password@mongodb.example.com/database"
+connection_string = "mongodb://root:password@mongodb.example.com/"
+database_name = "database"
 ignore_collections = [ "GlobalStats" ]
 datastore = { type = "filesystem", path = "/data/mongo-backups" }
 schedule = { enabled = true, cron = "0 0 * * *" }
 encryption_key = "azertyuiop""#;
   const CONFIG_2: &str = r#"[backup.awesome]
 display_name = "Awesome Backup"
-connection_string = "mongodb://root:password@mongodb.awesome.com/database"
+connection_string = "mongodb://root:password@mongodb.awesome.com/"
+database_name = "database"
 ignore_collections = [ "Collection123" ]
 datastore = { type = "s3", path = "/backups-dir" }
 schedule = { enabled = true, cron = "0 */5 * * *" }
@@ -461,7 +468,8 @@ encryption_key = "poiuytreza""#;
       .entry("backup.cool".to_string())
       .insert_entry(Backup {
         display_name: String::from("Cool Backup"),
-        connection_string: String::from("mongodb://root:password@mongodb.example.com/database"),
+        connection_string: String::from("mongodb://root:password@mongodb.example.com/"),
+        database_name: String::from("database"),
         ignore_collections: Vec::from([String::from("GlobalStats")]),
         datastore: BackupDatastore {
           path: String::from("/data/mongo-backups"),
@@ -488,7 +496,8 @@ encryption_key = "poiuytreza""#;
       .entry("backup.cool".to_string())
       .insert_entry(Backup {
         display_name: String::from("Cool Backup"),
-        connection_string: String::from("mongodb://root:password@mongodb.example.com/database"),
+        connection_string: String::from("mongodb://root:password@mongodb.example.com/"),
+        database_name: String::from("database"),
         ignore_collections: Vec::from([String::from("GlobalStats")]),
         datastore: BackupDatastore {
           path: String::from("/data/mongo-backups"),
