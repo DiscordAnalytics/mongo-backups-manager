@@ -1,3 +1,5 @@
+pub mod commands;
+
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -9,5 +11,6 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
+  Daemon,
   Tui,
 }
