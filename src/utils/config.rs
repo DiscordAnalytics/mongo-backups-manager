@@ -251,7 +251,7 @@ impl Config {
         .as_string()?,
       ignore_collections: map
         .get("ignore_collections")
-        .ok_or("missing ignore_collections")?
+        .unwrap_or(&TomlValue::Array(vec![]))
         .as_array()?
         .iter()
         .map(|v| v.as_string())
