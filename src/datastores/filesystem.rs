@@ -18,7 +18,7 @@ pub struct FilesystemDatastore {
 
 impl Datastore for FilesystemDatastore {
   fn new(base_path: &str) -> Self {
-    let mut instance = Self {
+    let instance = Self {
       base_path: PathBuf::from(base_path),
     };
 
