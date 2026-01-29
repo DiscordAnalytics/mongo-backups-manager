@@ -1,13 +1,14 @@
 use std::{
+  fs,
   fs::{File, create_dir_all, read_dir, remove_file},
   io::{ErrorKind, Read, Write},
   path::{Path, PathBuf},
   sync::OnceLock,
 };
 
-use regex::Regex;
-
 use crate::datastores::Datastore;
+use regex::Regex;
+use tokio::io::AsyncWrite;
 
 static BACKUP_FILE_REGEX: OnceLock<Regex> = OnceLock::new();
 
@@ -94,18 +95,31 @@ impl Datastore for FilesystemDatastore {
 
     Ok(())
   }
+
+  async fn open_write_stream(
+    &self,
+    object_name: &str,
+  ) -> Result<Box<dyn AsyncWrite + Unpin + Send>, String> {
+    let full_path = self.base_path.join(object_name);
+
+    let file = tokio::fs::File::create(full_path)
+      .await
+      .map_err(|e| format!("Failed to create file: {}", e))?;
+
+    Ok(Box::new(file))
+  }
 }
 
 #[cfg(test)]
 mod tests {
   use std::fs::{create_dir_all, write};
 
-  use chrono::Timelike;
-
   use crate::{
     datastores::{Datastore, FilesystemDatastore},
     tests::{clean_test_dir, get_test_dir_path},
   };
+  use chrono::Timelike;
+  use tokio::io::AsyncWriteExt;
 
   #[test]
   fn fs_datastore_no_dir_initialization() {
@@ -283,5 +297,23 @@ mod tests {
     assert!(res.is_err());
 
     clean_test_dir(test_dir_path)
+  }
+
+  #[tokio::test]
+  async fn fs_datastore_open_write_stream() {
+    let test_dir_path = get_test_dir_path("fs_datastore_delete_unknown_object");
+    clean_test_dir(test_dir_path.clone());
+    let datastore = FilesystemDatastore::new(test_dir_path.as_str());
+
+    let mut stream = datastore
+      .open_write_stream("test.txt")
+      .await
+      .expect("Failed to open write stream");
+
+    stream.write_all(b"first test :)").await.unwrap();
+    stream.write_all(b"second test :)").await.unwrap();
+    stream.flush().await.unwrap();
+
+    clean_test_dir(test_dir_path.clone());
   }
 }
