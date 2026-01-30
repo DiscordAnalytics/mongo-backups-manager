@@ -437,7 +437,7 @@ impl Config {
 #[cfg(test)]
 mod tests {
   use std::{collections::HashMap, fs::write};
-  use clap::builder::Str;
+
   use crate::utils::config::{
     Backup, BackupDatastore, BackupDatastoreType, BackupSchedule, Config,
   };
