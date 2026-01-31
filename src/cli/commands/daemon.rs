@@ -26,6 +26,7 @@ struct DatabaseCollectionHeader {
   name: String,
   options: CreateCollectionOptions,
   indexes: Vec<IndexModel>,
+  documents_count: u64,
   data: Vec<Document>,
 }
 
@@ -180,15 +181,21 @@ impl Daemon {
     let collection_indexes = collection
       .list_indexes()
       .await
-      .map_err(|e| format!("Failed to fetch database indexes: {e}"))?
+      .map_err(|e| format!("Failed to fetch collection indexes: {e}"))?
       .try_collect()
       .await
-      .map_err(|e| format!("Failed to fetch database indexes: {e}"))?;
+      .map_err(|e| format!("Failed to fetch collection indexes: {e}"))?;
+
+    let documents_count = collection
+      .count_documents(doc! {})
+      .await
+      .map_err(|e| format!("Failed to count documents: {e}"))?;
 
     let collection_header = DatabaseCollectionHeader {
       name: collection_specs.name,
       options: collection_specs.options,
       indexes: collection_indexes,
+      documents_count,
       data: Vec::new(),
     };
 
@@ -211,13 +218,25 @@ impl Daemon {
       .await
       .map_err(|e| format!("Failed to fetch collection data: {e}"))?;
 
+    let mut saved_documents = 0u64;
     while let Some(document) = cursor
       .try_next()
       .await
       .map_err(|e| format!("Failed to read document: {e}"))?
     {
+      saved_documents += 1;
+      let json_document = serde_json::to_value(document)
+        .map_err(|e| format!("Failed to parse JSON from document: {e}"))?;
+
+      let json_string = json_document.to_string()
+        + if saved_documents == collection_header.documents_count {
+          ""
+        } else {
+          ","
+        };
+
       write_stream
-        .write_all(document.to_string().as_ref())
+        .write_all(json_string.as_ref())
         .await
         .map_err(|e| format!("Failed to write document: {e}"))?;
     }
