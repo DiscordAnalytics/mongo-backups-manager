@@ -36,7 +36,7 @@ struct DatabaseMetadata {
   collection_hashes: HashMap<String, String>,
 }
 
-pub struct Daemon {}
+pub struct Daemon;
 
 impl Daemon {
   const DOCUMENTS_BATCH_SIZE: u32 = 1000;
