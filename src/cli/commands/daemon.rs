@@ -1,5 +1,3 @@
-use std::{path::Path, time::Duration};
-
 use chrono::Local;
 use cronexpr::{Crontab, jiff::Zoned};
 use futures::stream::TryStreamExt;
@@ -10,6 +8,8 @@ use mongodb::{
   results::CollectionSpecification,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::{path::Path, time::Duration};
 use tokio::io::AsyncWriteExt;
 
 use crate::{
@@ -28,6 +28,12 @@ struct DatabaseCollectionHeader {
   indexes: Vec<IndexModel>,
   documents_count: u64,
   data: Vec<Document>,
+}
+
+#[derive(Deserialize, Serialize)]
+struct DatabaseMetadata {
+  name: String,
+  collection_hashes: HashMap<String, String>,
 }
 
 pub struct Daemon {}
@@ -157,11 +163,16 @@ impl Daemon {
       {
         continue;
       }
+      Logger::info(format!("Backing up collection {}", collection_specs.name).as_str());
 
       Self::backup_collection(collection_specs.clone(), db.clone(), &datastore).await?;
 
       Logger::info(format!("Backed up collection {}", collection_specs.name).as_str());
     }
+
+    Logger::info(format!("Finalizing backup `{}`...", backup.display_name).as_str());
+
+    Self::finalize_backup(&datastore, db)?;
 
     Ok(())
   }
@@ -250,6 +261,32 @@ impl Daemon {
       .flush()
       .await
       .map_err(|e| format!("Failed to close write stream: {e}"))?;
+
+    Ok(())
+  }
+
+  fn finalize_backup(datastore: &impl Datastore, db: Database) -> Result<(), String> {
+    let collection_files = datastore.list_objects()?;
+    let mut collection_hashes: HashMap<String, String> = HashMap::new();
+
+    println!("{:?}", collection_files);
+
+    for file in collection_files {
+      let file_name: String = file.split(".").collect();
+      let file_hash = datastore.get_object_hash(file)?;
+
+      collection_hashes.insert(file_name, file_hash);
+    }
+
+    let meta = DatabaseMetadata {
+      name: db.name().to_string(),
+      collection_hashes,
+    };
+
+    let json_string =
+      serde_json::to_string(&meta).map_err(|e| format!("Failed to parse JSON: {e}"))?;
+
+    datastore.put_object(".database.json", json_string.as_ref())?;
 
     Ok(())
   }
