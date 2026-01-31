@@ -160,7 +160,7 @@ impl Daemon {
 
       Self::backup_collection(collection_specs.clone(), db.clone(), &datastore).await?;
 
-      Logger::info(format!("Backup up collection {}", collection_specs.name).as_str());
+      Logger::info(format!("Backed up collection {}", collection_specs.name).as_str());
     }
 
     Ok(())
