@@ -3,6 +3,7 @@ use mongodb::{
   error::{Error, Result},
 };
 
+#[derive(Clone)]
 pub struct DatabaseConnection {
   client: Option<Client>,
 }
@@ -12,10 +13,10 @@ impl DatabaseConnection {
     Self { client: None }
   }
 
-  pub async fn connect(&mut self, uri: &str) -> Result<()> {
+  pub async fn connect(&mut self, uri: &str) -> Result<Self> {
     let client = Client::with_uri_str(uri).await?;
     self.client = Some(client);
-    Ok(())
+    Ok(self.clone())
   }
 
   pub async fn disconnect(&mut self) -> Result<()> {
