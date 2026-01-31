@@ -1,6 +1,7 @@
 use std::{
   fs,
   fs::{File, create_dir_all, read_dir, remove_file},
+  io,
   io::{ErrorKind, Read, Write},
   path::{Path, PathBuf},
   sync::OnceLock,
@@ -8,6 +9,7 @@ use std::{
 
 use crate::datastores::Datastore;
 use regex::Regex;
+use sha2::{Digest, Sha256};
 use tokio::io::AsyncWrite;
 
 static BACKUP_FILE_REGEX: OnceLock<Regex> = OnceLock::new();
@@ -35,7 +37,7 @@ impl Datastore for FilesystemDatastore {
   }
 
   fn get_object(&self, path: String) -> Result<String, String> {
-    let full_path = self.base_path.join(Path::new(path.as_str()));
+    let full_path = self.base_path.join(path.as_str());
 
     let mut file = File::open(full_path.display().to_string())
       .map_err(|err| format!("Couldn't open file {}: {}", full_path.display(), err))?;
@@ -46,6 +48,17 @@ impl Datastore for FilesystemDatastore {
       .map_err(|err| format!("Couldn't read file {}: {}", full_path.display(), err))?;
 
     Ok(content)
+  }
+
+  fn get_object_hash(&self, path: String) -> Result<String, String> {
+    let full_path = self.base_path.join(path);
+    let mut file = File::open(full_path).map_err(|e| format!("Failed to open file: {e}"))?;
+    let mut sha256 = Sha256::new();
+
+    io::copy(&mut file, &mut sha256).map_err(|e| format!("Failed to hash from file: {e}"))?;
+    let hash = sha256.finalize();
+
+    Ok(format!("{:x}", hash))
   }
 
   fn list_objects(&self) -> Result<Vec<String>, String> {
@@ -66,7 +79,7 @@ impl Datastore for FilesystemDatastore {
   }
 
   fn put_object(&self, object_name: &str, obj_content: &[u8]) -> Result<(), String> {
-    let file_path = self.base_path.join(Path::new(object_name));
+    let file_path = self.base_path.join(object_name);
 
     if file_path.exists() {
       return Err(format!("File {} already exists", file_path.display()));
@@ -83,7 +96,7 @@ impl Datastore for FilesystemDatastore {
   }
 
   fn delete_object(&self, object_name: &str) -> Result<(), String> {
-    let file_path = self.base_path.join(Path::new(object_name));
+    let file_path = self.base_path.join(object_name);
 
     let _ = remove_file(file_path.clone()).map_err(|e| {
       if e.kind() == ErrorKind::NotFound {
