@@ -60,8 +60,9 @@ jobs:
           RUSTFLAGS: "-Dwarnings"
       - uses: actions/upload-artifact@v6
         with:
-          path: ./target/release/mongo-backups-manager
+          path: ./target/release/mbm
           name: mbm_linux_x64
+          if-no-files-found: error
 
   cargo_tests:
     if: github.event.pull_request.draft == false
