@@ -2,7 +2,7 @@ name: CI
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize, ready_for_review]
+    types: [ opened, reopened, synchronize, ready_for_review ]
   workflow_dispatch:
 
 concurrency:
@@ -46,7 +46,7 @@ jobs:
         env:
           RUSTFLAGS: "-Dwarnings"
 
-  cargo_check:
+  cargo_build:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
@@ -55,9 +55,13 @@ jobs:
         run: rustup update stable && rustup default stable
       - uses: Swatinem/rust-cache@v2
       - name: Run Cargo Check
-        run: cargo check
+        run: cargo build --release
         env:
           RUSTFLAGS: "-Dwarnings"
+      - uses: actions/upload-artifact@v6
+        with:
+          path: ./target/release/mongo-backups-manager
+          name: mbm_linux_x64
 
   cargo_tests:
     if: github.event.pull_request.draft == false
@@ -69,3 +73,42 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Run Cargo Test
         run: cargo test
+
+  backup_test:
+    needs: cargo_build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        mongodb-version: [ '7.0', '8.0' ]
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          sparse-checkout: .github
+
+      - uses: actions/download-artifact@v6
+
+      - name: Start MongoDB
+        uses: supercharge/mongodb-github-action@1.12.1
+        with:
+          mongodb-version: ${{ matrix.mongodb-version }}
+          mongodb-username: mbm
+          mongodb-password: example
+          mongodb-db: example
+
+      - name: Seed Database
+        run: mongosh "mongodb://mbm:example@localhost:27017/example?authSource=admin" ./.github/ci_database_seed.js
+
+      - name: Create config
+        run: curl https://gist.githubusercontent.com/Nonolanlan1007/5af44878616e516abe253c18f62f2f6b/raw/0d862738749a19d3ef80b56faf89d5cf912f95e9/mbm_ci_test_config.toml > config.toml
+
+      - name: Run Backup
+        env:
+          CONFIG_FILE: ./config.toml
+        run: ./mbm_linux_x64 backup start test
+
+      - name: Check backup files
+        run: |
+          mv ./backups/**/*.json ./
+          echo "67563e2343d2bb0119e55a6497f6dc157e9c24a33035bf1387fa978b05ca5de1 ./telemetry.json" > checksum.txt
+          echo "f28ef00dac3da4e33c30e73caa90ad04c1f1252562e1a5bc0e47634d46726b7d ./users.json" >> checksum.txt
+          sha256sum --check checksum.txt
