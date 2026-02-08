@@ -1,16 +1,16 @@
 use std::{
-  fs,
   fs::{File, create_dir_all, read_dir, remove_file},
   io,
   io::{ErrorKind, Read, Write},
-  path::{Path, PathBuf},
+  path::PathBuf,
   sync::OnceLock,
 };
 
-use crate::datastores::Datastore;
 use regex::Regex;
 use sha2::{Digest, Sha256};
 use tokio::io::AsyncWrite;
+
+use crate::datastores::Datastore;
 
 static BACKUP_FILE_REGEX: OnceLock<Regex> = OnceLock::new();
 
@@ -126,12 +126,13 @@ impl Datastore for FilesystemDatastore {
 mod tests {
   use std::fs::{create_dir_all, write};
 
+  use chrono::Timelike;
+  use tokio::io::AsyncWriteExt;
+
   use crate::{
     datastores::{Datastore, FilesystemDatastore},
     tests::{clean_test_dir, get_test_dir_path},
   };
-  use chrono::Timelike;
-  use tokio::io::AsyncWriteExt;
 
   #[test]
   fn fs_datastore_no_dir_initialization() {
