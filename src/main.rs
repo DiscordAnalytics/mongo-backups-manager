@@ -4,7 +4,10 @@ use clap::Parser;
 use dotenvy::dotenv;
 
 use crate::{
-  cli::{Cli, Commands, commands::Daemon},
+  cli::{
+    BackupCommand, Cli, Commands,
+    commands::{self, Daemon},
+  },
   ui::app::App,
 };
 
@@ -21,6 +24,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
   match cli.command {
     Some(Commands::Daemon) => Daemon::start().await,
+    Some(Commands::Backup { action }) => match action {
+      BackupCommand::Start { name } => commands::backup::start(name).await,
+      _ => todo!(),
+    },
     None | Some(Commands::Tui) => App::new().run().await?,
   };
 
