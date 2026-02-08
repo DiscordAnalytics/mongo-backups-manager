@@ -39,6 +39,7 @@ enum TomlValue {
   Array(Vec<TomlValue>),
 }
 
+#[allow(unused)]
 impl TomlValue {
   fn type_name(&self) -> &'static str {
     match self {

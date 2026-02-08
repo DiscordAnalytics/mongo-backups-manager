@@ -3,6 +3,7 @@ use tokio::io::AsyncWrite;
 pub mod filesystem;
 pub use filesystem::FilesystemDatastore;
 
+#[allow(unused)]
 pub trait Datastore {
   fn new(base_path: &str) -> Self;
 

@@ -8,6 +8,7 @@ pub struct DatabaseConnection {
   client: Option<Client>,
 }
 
+#[allow(unused)]
 impl DatabaseConnection {
   pub fn new() -> Self {
     Self { client: None }
