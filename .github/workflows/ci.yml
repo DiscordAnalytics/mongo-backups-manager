@@ -87,6 +87,8 @@ jobs:
           sparse-checkout: .github
 
       - uses: actions/download-artifact@v6
+        with:
+          path: .
 
       - name: Start MongoDB
         uses: supercharge/mongodb-github-action@1.12.1
