@@ -47,19 +47,20 @@ impl Daemon {
 
     for (_, backup) in config.backups.into_iter() {
       if backup.schedule.enabled {
-        let backup_schedule = cronexpr::parse_crontab(backup.schedule.cron.as_str());
-        if backup_schedule.is_err() {
-          Logger::error(backup_schedule.err().unwrap().to_string().as_str());
-          Logger::error(
-            format!(
-              "Invalid cron string for backup `{}`. Skipped schedule",
-              backup.display_name
-            )
-            .as_str(),
-          );
-          continue;
-        }
-        let backup_schedule = backup_schedule.unwrap();
+        let backup_schedule = match cronexpr::parse_crontab(backup.schedule.cron.as_str()) {
+          Ok(b) => b,
+          Err(err) => {
+            Logger::error(err.to_string().as_str());
+            Logger::error(
+              format!(
+                "Invalid cron string for backup `{}`. Skipped schedule",
+                backup.display_name
+              )
+              .as_str(),
+            );
+            continue;
+          }
+        };
 
         let backup_schedule_clone = backup_schedule.clone();
         let backup_clone = backup.clone();
