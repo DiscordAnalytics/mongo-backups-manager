@@ -269,8 +269,6 @@ impl Daemon {
     let collection_files = datastore.list_objects()?;
     let mut collection_hashes: HashMap<String, String> = HashMap::new();
 
-    println!("{:?}", collection_files);
-
     for file in collection_files {
       let file_name: String = file.split(".").collect();
       let file_hash = datastore.get_object_hash(file)?;
