@@ -1,3 +1,5 @@
+use std::{collections::HashMap, path::Path, time::Duration};
+
 use chrono::Local;
 use cronexpr::{Crontab, jiff::Zoned};
 use futures::stream::TryStreamExt;
@@ -8,8 +10,6 @@ use mongodb::{
   results::CollectionSpecification,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::{path::Path, time::Duration};
 use tokio::io::AsyncWriteExt;
 
 use crate::{
@@ -115,7 +115,7 @@ impl Daemon {
     schedule.find_next(now.to_rfc3339().as_str())
   }
 
-  async fn start_backup_job(backup: Backup) -> Result<(), String> {
+  pub async fn start_backup_job(backup: Backup) -> Result<(), String> {
     let connection = DatabaseConnection::new()
       .connect(backup.connection_string.as_str())
       .await
