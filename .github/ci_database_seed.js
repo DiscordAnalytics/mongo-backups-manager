@@ -26,10 +26,9 @@ db.users.createIndex({email: 1}, {unique: true});
 const batchSize = 10000;
 
 const telemetryDocs = [];
-const baseDate = new Date('2026-01-01T00:00:00Z');
 for (let i = 0; i < batchSize; i++) {
     telemetryDocs.push({
-        timestamp: new Date(baseDate.getTime() + (i * 1000)),
+        timestamp: new Date('2026-01-01T00:00:00Z'),
         sensorId: `sensor_${i}`,
         value: i * 100
     });
@@ -43,7 +42,7 @@ for (let i = 0; i < batchSize; i++) {
         status: (i / 2) !== 0 ? "active" : "inactive",
         metadata: {
             loginCount: i,
-            lastSeen: new Date("2026-02-08T18:48:24.218Z")
+            lastSeen: new Date('2026-01-01T00:00:00Z')
         }
     });
 }
