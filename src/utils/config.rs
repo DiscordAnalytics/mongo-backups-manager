@@ -236,6 +236,10 @@ impl Config {
   }
 
   fn parse_backup(map: &HashMap<String, TomlValue>) -> Result<Backup, String> {
+    let mut default_schedule = HashMap::new();
+    default_schedule.insert(String::from("enabled"), TomlValue::Bool(false));
+    default_schedule.insert(String::from("cron"), TomlValue::String(String::new()));
+
     Ok(Backup {
       display_name: map
         .get("display_name")
@@ -257,7 +261,11 @@ impl Config {
         .map(|v| v.as_string())
         .collect::<Result<_, _>>()?,
       datastore: Self::parse_datastore(map.get("datastore").ok_or("missing datastore")?)?,
-      schedule: Self::parse_schedule(map.get("schedule").ok_or("missing schedule")?)?,
+      schedule: Self::parse_schedule(
+        map
+          .get("schedule")
+          .unwrap_or(&TomlValue::Object(default_schedule)),
+      )?,
       encryption_key: map
         .get("encryption_key")
         .map(|v| v.as_string())
