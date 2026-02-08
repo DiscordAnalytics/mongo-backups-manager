@@ -117,7 +117,9 @@ jobs:
       - name: Run Backup
         env:
           CONFIG_FILE: ./config.toml
-        run: ./mbm_linux_x64 backup start test
+        run: |
+          ls -a 
+          ./mbm_linux_x64 backup start test
 
       - name: Check backup files
         run: |
