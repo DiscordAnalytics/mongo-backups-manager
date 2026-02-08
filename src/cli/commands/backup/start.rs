@@ -1,7 +1,9 @@
-use crate::Daemon;
-use crate::utils::config::Config;
-use crate::utils::logger::Logger;
 use std::process::exit;
+
+use crate::{
+  Daemon,
+  utils::{config::Config, logger::Logger},
+};
 
 pub async fn start(name: String) {
   let config = Config::new();
