@@ -54,7 +54,7 @@ jobs:
       - name: Install rust stable toolchain
         run: rustup update stable && rustup default stable
       - uses: Swatinem/rust-cache@v2
-      - name: Run Cargo Check
+      - name: Run Cargo Build
         run: cargo build --release
         env:
           RUSTFLAGS: "-Dwarnings"
