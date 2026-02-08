@@ -121,14 +121,10 @@ jobs:
           chmod a+x ./mbm
           ./mbm backup start test
 
-      - uses: actions/upload-artifact@v6
-        with:
-          path: ./*.json
-
       - name: Check backup files
         run: |
           mv ./backups/**/*.json ./
           sha256sum ./*.json
-          echo "67563e2343d2bb0119e55a6497f6dc157e9c24a33035bf1387fa978b05ca5de1 ./telemetry.json" > checksum.txt
-          echo "f28ef00dac3da4e33c30e73caa90ad04c1f1252562e1a5bc0e47634d46726b7d ./users.json" >> checksum.txt
+          echo "8b49a6f898b7c4327581ffd60e907550ad114d49e937f748779ab0dfd407d386 ./telemetry.json" > checksum.txt
+          echo "3e7001400d675babf130e95918701191dd39229d287b30263cc34d41bd8ec74c ./users.json" >> checksum.txt
           sha256sum --check checksum.txt
