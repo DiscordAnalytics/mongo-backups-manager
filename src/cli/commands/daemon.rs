@@ -270,7 +270,7 @@ impl Daemon {
     let mut collection_hashes: HashMap<String, String> = HashMap::new();
 
     for file in collection_files {
-      let file_name: String = file.split(".").collect();
+      let file_name: String = file.split(".").next().unwrap().to_string();
       let file_hash = datastore.get_object_hash(file)?;
 
       collection_hashes.insert(file_name, file_hash);
