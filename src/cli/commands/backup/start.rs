@@ -10,7 +10,7 @@ pub async fn start(name: String) {
   let backup_config = config
     .backups
     .iter()
-    .find(|(backup_name, _)| **backup_name == name);
+    .find(|(backup_name, _)| **backup_name == format!("backup.{name}"));
 
   if backup_config.is_none() {
     Logger::error("Backup not found");
