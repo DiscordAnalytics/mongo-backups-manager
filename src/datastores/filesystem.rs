@@ -268,12 +268,9 @@ mod tests {
     clean_test_dir(test_dir_path.clone());
     let datastore = FilesystemDatastore::new(test_dir_path.as_str());
 
-    let mut files: Vec<u32> = vec![];
-    for _ in 0..3 {
-      let timestamp = chrono::Local::now().nanosecond();
-      let file_name = format!("fake_backup_{timestamp}.json");
+    for i in 0..3 {
+      let file_name = format!("fake_backup_{i}");
       let _ = datastore.put_object(file_name.as_str(), b"test");
-      files.push(timestamp);
     }
 
     let res = datastore.list_objects();
