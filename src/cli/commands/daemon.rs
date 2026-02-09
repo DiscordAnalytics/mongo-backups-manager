@@ -102,15 +102,18 @@ impl Daemon {
           }
         });
 
-        let date = Self::get_next_cron_run(&backup_schedule);
-        Logger::info(
-          format!(
-            "Scheduled backup `{}`. Next run: {}",
-            backup.display_name,
-            date.unwrap()
-          )
-          .as_str(),
-        );
+        match Self::get_next_cron_run(&backup_schedule) {
+          Ok(date) => Logger::info(
+            format!(
+              "Scheduled backup `{}`. Next run: {}",
+              backup.display_name, date
+            )
+            .as_str(),
+          ),
+          Err(e) => Logger::error(
+            format!("Failed to get next run for `{}`: {e}", backup.display_name).as_str(),
+          ),
+        }
       } else {
         Logger::info(format!("Skipped backup `{}` schedule", backup.display_name).as_str());
       }
