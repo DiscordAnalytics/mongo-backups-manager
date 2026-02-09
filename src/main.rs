@@ -38,13 +38,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 pub mod tests {
   use std::{fs::remove_dir_all, path::PathBuf};
 
-  pub fn get_test_dir_path(test_name: &str) -> String {
+  pub fn get_test_dir_path(test_name: &str) -> PathBuf {
     PathBuf::from(format!("/tmp/mbm_tests_{test_name}").as_str())
-      .display()
-      .to_string()
   }
 
-  pub fn clean_test_dir(path: String) {
+  pub fn clean_test_dir(path: PathBuf) {
     let _ = remove_dir_all(path).unwrap_or(());
   }
 }

@@ -163,7 +163,8 @@ impl Daemon {
       backup.database_name, backup_timestamp
     ));
     let datastore = match backup.datastore.storage_type {
-      BackupDatastoreType::FileSystem => FilesystemDatastore::new(datastore_path.to_str().unwrap()),
+      BackupDatastoreType::FileSystem => FilesystemDatastore::new(datastore_path.as_path())
+        .map_err(|e| format!("Failed to initalize datastore: {e}"))?,
       BackupDatastoreType::S3 => todo!(),
     };
 

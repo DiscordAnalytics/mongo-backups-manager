@@ -1,3 +1,5 @@
+use std::{io::Error, path::Path};
+
 use tokio::io::AsyncWrite;
 
 pub mod filesystem;
@@ -5,7 +7,9 @@ pub use filesystem::FilesystemDatastore;
 
 #[allow(unused)]
 pub trait Datastore {
-  fn new(base_path: &str) -> Self;
+  fn new(base_path: &Path) -> Result<Self, Error>
+  where
+    Self: Sized;
 
   fn get_object(&self, path: String) -> Result<String, String>;
   fn get_object_hash(&self, path: String) -> Result<String, String>;

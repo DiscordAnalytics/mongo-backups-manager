@@ -1,13 +1,11 @@
-use std::{
-  fs::{File, create_dir_all, read_dir, remove_file},
-  io,
-  io::{ErrorKind, Read, Write},
-  path::PathBuf,
-  sync::OnceLock,
-};
-
 use regex::Regex;
 use sha2::{Digest, Sha256};
+use std::{
+  fs::{File, create_dir_all, read_dir, remove_file},
+  io::{self, Error, ErrorKind, Read, Write},
+  path::{Path, PathBuf},
+  sync::OnceLock,
+};
 use tokio::io::AsyncWrite;
 
 use crate::datastores::Datastore;
@@ -19,21 +17,21 @@ pub struct FilesystemDatastore {
 }
 
 impl Datastore for FilesystemDatastore {
-  fn new(base_path: &str) -> Self {
-    let instance = Self {
-      base_path: PathBuf::from(base_path),
-    };
+  fn new(base_path: &Path) -> Result<Self, Error> {
+    let base_path = base_path.to_path_buf();
 
-    if !instance.base_path.exists() {
-      let _ = create_dir_all(instance.base_path.clone())
-        .map_err(|err| panic!("Cannot create datastore base directory: {}", err));
+    if !base_path.exists() {
+      create_dir_all(&base_path)?;
     }
 
-    if !instance.base_path.is_dir() {
-      panic!("Datastore is not a directory")
+    if !base_path.is_dir() {
+      return Err(Error::new(
+        ErrorKind::InvalidInput,
+        "Datastore path is not a directory",
+      ));
     }
 
-    instance
+    Ok(Self { base_path })
   }
 
   fn get_object(&self, path: String) -> Result<String, String> {
@@ -124,9 +122,9 @@ impl Datastore for FilesystemDatastore {
 
 #[cfg(test)]
 mod tests {
-  use std::fs::{create_dir_all, write};
-
   use chrono::Timelike;
+  use std::fs::{create_dir_all, write};
+  use std::path::Path;
   use tokio::io::AsyncWriteExt;
 
   use crate::{
@@ -139,7 +137,7 @@ mod tests {
     let test_dir_path = get_test_dir_path("fs_datastore_no_dir_initialization");
     clean_test_dir(test_dir_path.clone());
 
-    let datastore = FilesystemDatastore::new(test_dir_path.as_str());
+    let datastore = FilesystemDatastore::new(test_dir_path.as_path()).unwrap();
 
     assert!(datastore.base_path.exists());
 
@@ -150,19 +148,19 @@ mod tests {
   #[should_panic]
   fn fs_datastore_file_initialization() {
     let test_dir_path = get_test_dir_path("fs_datastore_file_initialization");
-    let dump_file_path = format!("{}/test.txt", test_dir_path.clone());
+    let dump_file_path = test_dir_path.clone().join(Path::new("test.txt"));
     clean_test_dir(test_dir_path.clone());
 
     let _ = create_dir_all(test_dir_path.clone());
     let _ = write(dump_file_path.clone(), b"test file :)");
-    let _ = FilesystemDatastore::new(dump_file_path.as_str());
+    let _ = FilesystemDatastore::new(dump_file_path.as_path()).unwrap();
 
     clean_test_dir(test_dir_path);
   }
 
   #[test]
   fn fs_datastore_put_in_dev_dir() {
-    let datastore = FilesystemDatastore::new("/dev");
+    let datastore = FilesystemDatastore::new(Path::new("/dev")).unwrap();
     let res = datastore.put_object("test.txt", &[0]);
 
     assert!(res.is_err());
@@ -173,8 +171,8 @@ mod tests {
     let test_dir_path = get_test_dir_path("fs_datastore_put_existing_object");
     clean_test_dir(test_dir_path.clone());
 
-    let datastore = FilesystemDatastore::new(test_dir_path.as_str());
-    let res = datastore.put_object("test.txt", &[0]);
+    let datastore = FilesystemDatastore::new(test_dir_path.as_path()).unwrap();
+    let _ = datastore.put_object("test.txt", &[0]);
     let res = datastore.put_object("test.txt", &[0]);
 
     assert!(res.is_err());
@@ -187,7 +185,7 @@ mod tests {
     let test_dir_path = get_test_dir_path("fs_datastore_put_object");
     clean_test_dir(test_dir_path.clone());
 
-    let datastore = FilesystemDatastore::new(test_dir_path.as_str());
+    let datastore = FilesystemDatastore::new(test_dir_path.as_path()).unwrap();
 
     let res = datastore.put_object("test.txt", &[4]);
 
@@ -201,7 +199,7 @@ mod tests {
     let test_dir_path = get_test_dir_path("fs_datastore_get_object");
     clean_test_dir(test_dir_path.clone());
 
-    let datastore = FilesystemDatastore::new(test_dir_path.as_str());
+    let datastore = FilesystemDatastore::new(test_dir_path.as_path()).unwrap();
     let _ = datastore.put_object("test.txt", b"This is the best test :)");
 
     let res = datastore.get_object("test.txt".to_string());
@@ -217,7 +215,7 @@ mod tests {
   fn fs_datastore_get_unknown_object() {
     let test_dir_path = get_test_dir_path("fs_datastore_get_unknown_object");
     clean_test_dir(test_dir_path.clone());
-    let datastore = FilesystemDatastore::new(test_dir_path.as_str());
+    let datastore = FilesystemDatastore::new(test_dir_path.as_path()).unwrap();
 
     let res = datastore.get_object("test.txt".to_string());
     assert!(res.is_err());
@@ -229,7 +227,7 @@ mod tests {
   fn fs_datastore_get_dir() {
     let test_dir_path = get_test_dir_path("fs_datastore_get_dir");
     clean_test_dir(test_dir_path.clone());
-    let datastore = FilesystemDatastore::new(test_dir_path.as_str());
+    let datastore = FilesystemDatastore::new(test_dir_path.as_path()).unwrap();
 
     let res = datastore.get_object("".to_string());
     assert!(res.is_err());
@@ -241,7 +239,7 @@ mod tests {
   fn fs_datastore_list_objects() {
     let test_dir_path = get_test_dir_path("fs_datastore_list_objects");
     clean_test_dir(test_dir_path.clone());
-    let datastore = FilesystemDatastore::new(test_dir_path.as_str());
+    let datastore = FilesystemDatastore::new(test_dir_path.as_path()).unwrap();
 
     let mut files: Vec<u32> = vec![];
     for _ in 0..3 {
@@ -266,7 +264,7 @@ mod tests {
   fn fs_datastore_list_unknown_objects() {
     let test_dir_path = get_test_dir_path("fs_datastore_list_unknown_objects");
     clean_test_dir(test_dir_path.clone());
-    let datastore = FilesystemDatastore::new(test_dir_path.as_str());
+    let datastore = FilesystemDatastore::new(test_dir_path.as_path()).unwrap();
 
     for i in 0..3 {
       let file_name = format!("fake_backup_{i}");
@@ -286,7 +284,7 @@ mod tests {
   fn fs_datastore_delete_object() {
     let test_dir_path = get_test_dir_path("fs_datastore_delete_object");
     clean_test_dir(test_dir_path.clone());
-    let datastore = FilesystemDatastore::new(test_dir_path.as_str());
+    let datastore = FilesystemDatastore::new(test_dir_path.as_path()).unwrap();
 
     let _ = datastore.put_object("test.txt", b"Awesome test :)");
     let res = datastore.delete_object("test.txt");
@@ -300,7 +298,7 @@ mod tests {
   fn fs_datastore_delete_unknown_object() {
     let test_dir_path = get_test_dir_path("fs_datastore_delete_unknown_object");
     clean_test_dir(test_dir_path.clone());
-    let datastore = FilesystemDatastore::new(test_dir_path.as_str());
+    let datastore = FilesystemDatastore::new(test_dir_path.as_path()).unwrap();
 
     let res = datastore.delete_object("test.txt");
 
@@ -313,7 +311,7 @@ mod tests {
   async fn fs_datastore_open_write_stream() {
     let test_dir_path = get_test_dir_path("fs_datastore_delete_unknown_object");
     clean_test_dir(test_dir_path.clone());
-    let datastore = FilesystemDatastore::new(test_dir_path.as_str());
+    let datastore = FilesystemDatastore::new(test_dir_path.as_path()).unwrap();
 
     let mut stream = datastore
       .open_write_stream("test.txt")

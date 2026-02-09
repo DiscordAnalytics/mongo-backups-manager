@@ -17,7 +17,7 @@ pub async fn start(name: String) {
   };
 
   Logger::info(format!("Starting backup job {}...", backup_config.display_name).as_str());
-  match Daemon::start_backup_job(backup_config.clone()).await {
+  match Daemon::start_backup_job(backup_config).await {
     Ok(_) => Logger::highlight(
       format!(
         "Backup job {} successfully executed",
