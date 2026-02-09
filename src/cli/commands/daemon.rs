@@ -65,24 +65,35 @@ impl Daemon {
         let backup_schedule_clone = backup_schedule.clone();
         let backup_clone = backup.clone();
         tokio::spawn(async move {
-          let mut next = Self::get_next_cron_run(backup_schedule_clone.clone());
-
+          let mut next = match Self::get_next_cron_run(&backup_schedule_clone) {
+            Ok(n) => n,
+            Err(e) => {
+              Logger::error(format!("Invalid cron schedule: {e}").as_str());
+              return;
+            }
+          };
           loop {
             let now = Local::now();
-            if now.timestamp() == next.clone().unwrap().timestamp().as_second() {
+            if now.timestamp() == next.clone().timestamp().as_second() {
               Logger::info(format!("Starting backup job `{}`", backup_clone.display_name).as_str());
 
-              Self::start_backup_job(backup_clone.clone())
+              Self::start_backup_job(&backup_clone)
                 .await
                 .map_err(|e| format!("Backup job failed: {e}"))
                 .unwrap();
 
-              next = Self::get_next_cron_run(backup_schedule_clone.clone());
+              next = match Self::get_next_cron_run(&backup_schedule_clone) {
+                Ok(n) => n,
+                Err(e) => {
+                  Logger::error(format!("Failed to compute next cron run: {e}").as_str());
+                  return;
+                }
+              };
               Logger::info(
                 format!(
                   "Backup job `{}` done. Next run: {}",
                   backup_clone.display_name,
-                  next.clone().unwrap()
+                  next.clone()
                 )
                 .as_str(),
               );
@@ -92,7 +103,7 @@ impl Daemon {
           }
         });
 
-        let date = Self::get_next_cron_run(backup_schedule.clone());
+        let date = Self::get_next_cron_run(&backup_schedule);
         Logger::info(
           format!(
             "Scheduled backup `{}`. Next run: {}",
@@ -111,12 +122,12 @@ impl Daemon {
     }
   }
 
-  fn get_next_cron_run(schedule: Crontab) -> Result<Zoned, cronexpr::Error> {
+  fn get_next_cron_run(schedule: &Crontab) -> Result<Zoned, cronexpr::Error> {
     let now = Local::now();
     schedule.find_next(now.to_rfc3339().as_str())
   }
 
-  pub async fn start_backup_job(backup: Backup) -> Result<(), String> {
+  pub async fn start_backup_job(backup: &Backup) -> Result<(), String> {
     let connection = DatabaseConnection::new()
       .connect(backup.connection_string.as_str())
       .await
@@ -124,7 +135,7 @@ impl Daemon {
 
     let db = connection
       .client()
-      .unwrap()
+      .ok_or("MongoDB client not initialized")?
       .database(backup.database_name.as_str());
 
     let all_collection_names = db
@@ -271,7 +282,11 @@ impl Daemon {
     let mut collection_hashes: HashMap<String, String> = HashMap::new();
 
     for file in collection_files {
-      let file_name: String = file.split(".").next().unwrap().to_string();
+      let file_name = file
+        .split_once('.')
+        .map(|(name, _)| name)
+        .unwrap_or(&file)
+        .to_string();
       let file_hash = datastore.get_object_hash(file)?;
 
       collection_hashes.insert(file_name, file_hash);
