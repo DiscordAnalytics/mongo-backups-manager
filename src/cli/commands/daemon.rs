@@ -77,10 +77,9 @@ impl Daemon {
             if now.timestamp() == next.clone().timestamp().as_second() {
               Logger::info(format!("Starting backup job `{}`", backup_clone.display_name).as_str());
 
-              Self::start_backup_job(&backup_clone)
-                .await
-                .map_err(|e| format!("Backup job failed: {e}"))
-                .unwrap();
+              if let Err(e) = Self::start_backup_job(&backup_clone).await {
+                Logger::error(format!("Backup job failed: {e}").as_str());
+              }
 
               next = match Self::get_next_cron_run(&backup_schedule_clone) {
                 Ok(n) => n,
