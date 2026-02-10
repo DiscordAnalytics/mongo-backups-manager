@@ -1,11 +1,12 @@
-use regex::Regex;
-use sha2::{Digest, Sha256};
 use std::{
   fs::{File, create_dir_all, read_dir, remove_file},
   io::{self, Error, ErrorKind, Read, Write},
   path::{Path, PathBuf},
   sync::OnceLock,
 };
+
+use regex::Regex;
+use sha2::{Digest, Sha256};
 use tokio::io::AsyncWrite;
 
 use crate::datastores::Datastore;
@@ -122,9 +123,12 @@ impl Datastore for FilesystemDatastore {
 
 #[cfg(test)]
 mod tests {
+  use std::{
+    fs::{create_dir_all, write},
+    path::Path,
+  };
+
   use chrono::Timelike;
-  use std::fs::{create_dir_all, write};
-  use std::path::Path;
   use tokio::io::AsyncWriteExt;
 
   use crate::{
