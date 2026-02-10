@@ -43,6 +43,6 @@ pub mod tests {
   }
 
   pub fn clean_test_dir(path: PathBuf) {
-    let _ = remove_dir_all(path).unwrap_or(());
+    remove_dir_all(path).unwrap_or(());
   }
 }

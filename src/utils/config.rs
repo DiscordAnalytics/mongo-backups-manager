@@ -459,14 +459,14 @@ ignore_collections = [ "GlobalStats" ]
 datastore = { type = "filesystem", path = "/data/mongo-backups" }
 schedule = { enabled = true, cron = "0 0 * * *" }
 encryption_key = "azertyuiop""#;
-  const CONFIG_2: &str = r#"[backup.awesome]
-display_name = "Awesome Backup"
-connection_string = "mongodb://root:password@mongodb.awesome.com/"
-database_name = "database"
-ignore_collections = [ "Collection123" ]
-datastore = { type = "s3", path = "/backups-dir" }
-schedule = { enabled = true, cron = "0 */5 * * *" }
-encryption_key = "poiuytreza""#;
+  //const CONFIG_2: &str = r#"[backup.awesome]
+  //display_name = "Awesome Backup"
+  //connection_string = "mongodb://root:password@mongodb.awesome.com/"
+  //database_name = "database"
+  //ignore_collections = [ "Collection123" ]
+  //datastore = { type = "s3", path = "/backups-dir" }
+  //schedule = { enabled = true, cron = "0 */5 * * *" }
+  //encryption_key = "poiuytreza""#;
 
   #[test]
   fn config_parse_config() {

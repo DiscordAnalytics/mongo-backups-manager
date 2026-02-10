@@ -257,8 +257,8 @@ mod tests {
     assert!(res.is_ok());
     let res = res.unwrap();
 
-    for i in 0..3 {
-      assert!(res.contains(&format!("backup_cool_{}.json", files[i])));
+    for file in files {
+      assert!(res.contains(&format!("backup_cool_{}.json", file)));
     }
 
     clean_test_dir(test_dir_path);
