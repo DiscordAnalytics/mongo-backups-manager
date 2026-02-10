@@ -144,7 +144,7 @@ impl Daemon {
       .list_collection_names()
       .await
       .map_err(|e| format!("Failed to fetch collection names: {e}"))?;
-    let collections_count = all_collection_names.iter().count();
+    let collections_count = all_collection_names.len();
     Logger::info(
       format!(
         "Backing up {} collections from {}",

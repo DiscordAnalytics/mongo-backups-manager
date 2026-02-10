@@ -96,7 +96,7 @@ impl Datastore for FilesystemDatastore {
   fn delete_object(&self, object_name: &str) -> Result<(), String> {
     let file_path = self.base_path.join(object_name);
 
-    let _ = remove_file(file_path.clone()).map_err(|e| {
+    remove_file(file_path.clone()).map_err(|e| {
       if e.kind() == ErrorKind::NotFound {
         format!("File {} does not exist", file_path.display())
       } else {

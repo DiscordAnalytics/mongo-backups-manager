@@ -32,7 +32,7 @@ impl Logger {
       "{} - {}",
       Self::colorize(&Logger::get_date(), Color::Gray).as_str(),
       match color {
-        Some(color) => Self::colorize(&text, color),
+        Some(color) => Self::colorize(text, color),
         None => text.to_string(),
       }
     );
