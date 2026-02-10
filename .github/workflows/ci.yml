@@ -125,6 +125,6 @@ jobs:
         run: |
           mv ./backups/**/*.json ./
           sha256sum ./*.json
-          echo "67563e2343d2bb0119e55a6497f6dc157e9c24a33035bf1387fa978b05ca5de1 ./telemetry.json" > checksum.txt
-          echo "78d38881c2f68cfffed4f5d61e3078be54687114f6ad1514d7cb290b1235d116 ./users.json" >> checksum.txt
+          echo "a4055f4f744fdbd60d61709a3b180e61f1bfad2e07dfc388725bc21c93a1734c ./telemetry.json" > checksum.txt
+          echo "3b9e5af8209f86618eb148a11ee0cd2a8ba32452c8b6e1eadbfb9c2e686967d0 ./users.json" >> checksum.txt
           sha256sum --check checksum.txt
