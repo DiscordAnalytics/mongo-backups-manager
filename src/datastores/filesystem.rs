@@ -64,7 +64,7 @@ impl Datastore for FilesystemDatastore {
     let backup_file_regex =
       BACKUP_FILE_REGEX.get_or_init(|| Regex::new(r"\.?\w+\.json$").expect("invalid regex"));
     let dir_content = read_dir(self.base_path.clone())
-      .map_err(|err| format!("Cannot read read datastore directory content: {}", err))?
+      .map_err(|err| format!("Cannot read datastore directory content: {}", err))?
       .filter_map(Result::ok)
       .filter_map(|entry| {
         let name = entry.file_name();
