@@ -26,7 +26,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Some(Commands::Daemon) => Daemon::start().await,
     Some(Commands::Backup { action }) => match action {
       BackupCommand::Start { name } => commands::backup::start(name).await,
-      _ => todo!(),
+      BackupCommand::List => commands::backup::list(),
+      BackupCommand::Inspect => commands::backup::inspect(),
     },
     None | Some(Commands::Tui) => App::new().run().await?,
   };

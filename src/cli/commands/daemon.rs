@@ -124,7 +124,7 @@ impl Daemon {
     }
   }
 
-  fn get_next_cron_run(schedule: &Crontab) -> Result<Zoned, cronexpr::Error> {
+  pub fn get_next_cron_run(schedule: &Crontab) -> Result<Zoned, cronexpr::Error> {
     let now = Local::now();
     schedule.find_next(now.to_rfc3339().as_str())
   }
