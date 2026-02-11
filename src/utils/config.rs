@@ -1,31 +1,32 @@
 use std::{collections::HashMap, env, fs::File, io::Read, path::Path};
 
-#[derive(Debug, PartialEq)]
-enum BackupDatastoreType {
+#[derive(Debug, PartialEq, Clone)]
+pub enum BackupDatastoreType {
   FileSystem,
   S3,
 }
 
-#[derive(Debug, PartialEq)]
-struct BackupDatastore {
-  storage_type: BackupDatastoreType,
-  path: String,
+#[derive(Debug, PartialEq, Clone)]
+pub struct BackupDatastore {
+  pub storage_type: BackupDatastoreType,
+  pub(crate) path: String,
 }
 
-#[derive(Debug, PartialEq)]
-struct BackupSchedule {
-  enabled: bool,
-  cron: String,
+#[derive(Debug, PartialEq, Clone)]
+pub struct BackupSchedule {
+  pub enabled: bool,
+  pub cron: String,
 }
 
-#[derive(Debug, PartialEq)]
-struct Backup {
-  display_name: String,
-  connection_string: String,
-  ignore_collections: Vec<String>,
-  datastore: BackupDatastore,
-  schedule: BackupSchedule,
-  encryption_key: Option<String>,
+#[derive(Debug, PartialEq, Clone)]
+pub struct Backup {
+  pub display_name: String,
+  pub connection_string: String,
+  pub database_name: String,
+  pub ignore_collections: Vec<String>,
+  pub datastore: BackupDatastore,
+  pub schedule: BackupSchedule,
+  pub encryption_key: Option<String>,
 }
 
 #[derive(Debug)]
@@ -38,6 +39,7 @@ enum TomlValue {
   Array(Vec<TomlValue>),
 }
 
+#[allow(unused)]
 impl TomlValue {
   fn type_name(&self) -> &'static str {
     match self {
@@ -142,7 +144,7 @@ enum Frame {
 
 #[derive(Debug)]
 pub struct Config {
-  backups: HashMap<String, Backup>,
+  pub backups: HashMap<String, Backup>,
 }
 
 impl Config {
@@ -186,6 +188,9 @@ impl Config {
 
       if line.starts_with('[') && line.ends_with(']') {
         table = line[1..line.len() - 1].to_string();
+        if result.contains_key(&table) {
+          return Err(format!("Duplicate table definition: [{}]", table));
+        }
         result.insert(table.clone(), HashMap::new());
         continue;
       }
@@ -224,9 +229,23 @@ impl Config {
       }
     }
 
+    let mut used_display_names = HashMap::<String, String>::new();
     for (table, values) in result {
       if table.starts_with("backup.") {
+        if self.backups.contains_key(&table) {
+          return Err(format!("Duplicate backup id: {}", table));
+        }
+
         let backup = Self::parse_backup(&values)?;
+
+        if let Some(existing) = used_display_names.get(&backup.display_name) {
+          return Err(format!(
+            "Duplicate backup display_name '{}' (used by '{}' and '{}')",
+            backup.display_name, existing, table
+          ));
+        }
+
+        used_display_names.insert(backup.display_name.clone(), table.clone());
         self.backups.insert(table, backup);
       }
     }
@@ -235,6 +254,10 @@ impl Config {
   }
 
   fn parse_backup(map: &HashMap<String, TomlValue>) -> Result<Backup, String> {
+    let mut default_schedule = HashMap::new();
+    default_schedule.insert(String::from("enabled"), TomlValue::Bool(false));
+    default_schedule.insert(String::from("cron"), TomlValue::String(String::new()));
+
     Ok(Backup {
       display_name: map
         .get("display_name")
@@ -244,15 +267,23 @@ impl Config {
         .get("connection_string")
         .ok_or("missing connection_string")?
         .as_string()?,
+      database_name: map
+        .get("database_name")
+        .ok_or("missing database_name")?
+        .as_string()?,
       ignore_collections: map
         .get("ignore_collections")
-        .ok_or("missing ignore_collections")?
+        .unwrap_or(&TomlValue::Array(vec![]))
         .as_array()?
         .iter()
         .map(|v| v.as_string())
         .collect::<Result<_, _>>()?,
       datastore: Self::parse_datastore(map.get("datastore").ok_or("missing datastore")?)?,
-      schedule: Self::parse_schedule(map.get("schedule").ok_or("missing schedule")?)?,
+      schedule: Self::parse_schedule(
+        map
+          .get("schedule")
+          .unwrap_or(&TomlValue::Object(default_schedule)),
+      )?,
       encryption_key: map
         .get("encryption_key")
         .map(|v| v.as_string())
@@ -345,7 +376,7 @@ impl Config {
       match c {
         '"' => {
           let mut s = String::new();
-          while let Some(ch) = chars.next() {
+          for ch in chars.by_ref() {
             if ch == '"' {
               break;
             }
@@ -439,18 +470,20 @@ mod tests {
 
   const CONFIG_1: &str = r#"[backup.cool]
 display_name = "Cool Backup"
-connection_string = "mongodb://root:password@mongodb.example.com/database"
+connection_string = "mongodb://root:password@mongodb.example.com/"
+database_name = "database"
 ignore_collections = [ "GlobalStats" ]
 datastore = { type = "filesystem", path = "/data/mongo-backups" }
 schedule = { enabled = true, cron = "0 0 * * *" }
 encryption_key = "azertyuiop""#;
-  const CONFIG_2: &str = r#"[backup.awesome]
-display_name = "Awesome Backup"
-connection_string = "mongodb://root:password@mongodb.awesome.com/database"
-ignore_collections = [ "Collection123" ]
-datastore = { type = "s3", path = "/backups-dir" }
-schedule = { enabled = true, cron = "0 */5 * * *" }
-encryption_key = "poiuytreza""#;
+  //const CONFIG_2: &str = r#"[backup.awesome]
+  //display_name = "Awesome Backup"
+  //connection_string = "mongodb://root:password@mongodb.awesome.com/"
+  //database_name = "database"
+  //ignore_collections = [ "Collection123" ]
+  //datastore = { type = "s3", path = "/backups-dir" }
+  //schedule = { enabled = true, cron = "0 */5 * * *" }
+  //encryption_key = "poiuytreza""#;
 
   #[test]
   fn config_parse_config() {
@@ -461,7 +494,8 @@ encryption_key = "poiuytreza""#;
       .entry("backup.cool".to_string())
       .insert_entry(Backup {
         display_name: String::from("Cool Backup"),
-        connection_string: String::from("mongodb://root:password@mongodb.example.com/database"),
+        connection_string: String::from("mongodb://root:password@mongodb.example.com/"),
+        database_name: String::from("database"),
         ignore_collections: Vec::from([String::from("GlobalStats")]),
         datastore: BackupDatastore {
           path: String::from("/data/mongo-backups"),
@@ -488,7 +522,8 @@ encryption_key = "poiuytreza""#;
       .entry("backup.cool".to_string())
       .insert_entry(Backup {
         display_name: String::from("Cool Backup"),
-        connection_string: String::from("mongodb://root:password@mongodb.example.com/database"),
+        connection_string: String::from("mongodb://root:password@mongodb.example.com/"),
+        database_name: String::from("database"),
         ignore_collections: Vec::from([String::from("GlobalStats")]),
         datastore: BackupDatastore {
           path: String::from("/data/mongo-backups"),
