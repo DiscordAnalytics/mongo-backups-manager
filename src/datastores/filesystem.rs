@@ -7,7 +7,7 @@ use std::{
 
 use regex::Regex;
 use sha2::{Digest, Sha256};
-use tokio::io::AsyncWrite;
+use tokio::{fs::File as TokioFile, io::AsyncWrite};
 
 use crate::datastores::Datastore;
 
@@ -113,7 +113,7 @@ impl Datastore for FilesystemDatastore {
   ) -> Result<Box<dyn AsyncWrite + Unpin + Send>, String> {
     let full_path = self.base_path.join(object_name);
 
-    let file = tokio::fs::File::create(full_path)
+    let file = TokioFile::create(full_path)
       .await
       .map_err(|e| format!("Failed to create file: {}", e))?;
 
