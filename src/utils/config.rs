@@ -188,6 +188,9 @@ impl Config {
 
       if line.starts_with('[') && line.ends_with(']') {
         table = line[1..line.len() - 1].to_string();
+        if result.contains_key(&table) {
+          return Err(format!("Duplicate table definition: [{}]", table));
+        }
         result.insert(table.clone(), HashMap::new());
         continue;
       }
@@ -226,9 +229,23 @@ impl Config {
       }
     }
 
+    let mut used_display_names = HashMap::<String, String>::new();
     for (table, values) in result {
       if table.starts_with("backup.") {
+        if self.backups.contains_key(&table) {
+          return Err(format!("Duplicate backup id: {}", table));
+        }
+
         let backup = Self::parse_backup(&values)?;
+
+        if let Some(existing) = used_display_names.get(&backup.display_name) {
+          return Err(format!(
+            "Duplicate backup display_name '{}' (used by '{}' and '{}')",
+            backup.display_name, existing, table
+          ));
+        }
+
+        used_display_names.insert(backup.display_name.clone(), table.clone());
         self.backups.insert(table, backup);
       }
     }
