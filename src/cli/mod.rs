@@ -21,7 +21,7 @@ pub enum Commands {
 
 #[derive(Subcommand)]
 pub enum BackupCommand {
-  Inspect,
+  Inspect { name: String },
   List,
   Start { name: String },
 }
