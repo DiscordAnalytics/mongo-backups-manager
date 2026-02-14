@@ -9,16 +9,17 @@ use regex::Regex;
 use sha2::{Digest, Sha256};
 use tokio::{fs::File as TokioFile, io::AsyncWrite};
 
-use crate::{cli::commands::daemon::DatabaseMetadata, datastores::Datastore};
+use crate::{datastores::DatastoreTrait, utils::backup_manager::DatabaseMetadata};
 
 static BACKUP_FILE_REGEX: OnceLock<Regex> = OnceLock::new();
 static BACKUP_DIR_REGEX: OnceLock<Regex> = OnceLock::new();
 
+#[derive(Debug, PartialEq, Clone)]
 pub struct FilesystemDatastore {
   pub base_path: PathBuf,
 }
 
-impl Datastore for FilesystemDatastore {
+impl DatastoreTrait for FilesystemDatastore {
   fn new(base_path: &Path) -> Result<Self, Error> {
     let base_path = base_path.to_path_buf();
 
@@ -119,6 +120,10 @@ impl Datastore for FilesystemDatastore {
       return Err(format!("File {} already exists", file_path.display()));
     }
 
+    if let Some(parent) = file_path.parent() {
+      create_dir_all(parent).map_err(|e| format!("Failed to create parent directory: {e}"))?;
+    }
+
     let mut file = File::create(file_path.clone())
       .map_err(|e| format!("Cannot create file {}: {}", file_path.display(), e))?;
 
@@ -149,6 +154,10 @@ impl Datastore for FilesystemDatastore {
   ) -> Result<Box<dyn AsyncWrite + Unpin + Send>, String> {
     let full_path = self.base_path.join(object_name);
 
+    let _ = self
+      .put_object(object_name, b"")
+      .map_err(|e| format!("Failed to create file: {}", e))?;
+
     let file = TokioFile::create(full_path)
       .await
       .map_err(|e| format!("Failed to create file: {}", e))?;
@@ -168,7 +177,7 @@ mod tests {
   use tokio::io::AsyncWriteExt;
 
   use crate::{
-    datastores::{Datastore, FilesystemDatastore},
+    datastores::{DatastoreTrait, FilesystemDatastore},
     tests::{clean_test_dir, get_test_dir_path},
   };
 
