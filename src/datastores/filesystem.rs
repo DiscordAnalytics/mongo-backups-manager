@@ -9,12 +9,13 @@ use regex::Regex;
 use sha2::{Digest, Sha256};
 use tokio::{fs::File as TokioFile, io::AsyncWrite};
 
-use crate::datastores::Datastore;
+use crate::{cli::commands::daemon::DatabaseMetadata, datastores::Datastore};
 
 static BACKUP_FILE_REGEX: OnceLock<Regex> = OnceLock::new();
+static BACKUP_DIR_REGEX: OnceLock<Regex> = OnceLock::new();
 
 pub struct FilesystemDatastore {
-  base_path: PathBuf,
+  pub base_path: PathBuf,
 }
 
 impl Datastore for FilesystemDatastore {
@@ -33,6 +34,25 @@ impl Datastore for FilesystemDatastore {
     }
 
     Ok(Self { base_path })
+  }
+
+  fn check_backup_integrity(&self) -> Result<bool, String> {
+    let backup_summary_file = self.get_object(".database.json".to_string())?;
+    let backup_summary = serde_json::from_str::<DatabaseMetadata>(backup_summary_file.as_str())
+      .map_err(|e| format!("Failed to parse metadata file: {e}"))?;
+
+    for (collection, hash) in backup_summary.collection_hashes {
+      let real_hash = match self.get_object_hash(format!("{collection}.json")) {
+        Ok(value) => Some(value),
+        Err(_) => None,
+      };
+
+      if real_hash.is_none_or(|value| value != hash) {
+        return Ok(false);
+      }
+    }
+
+    Ok(true)
   }
 
   fn get_object(&self, path: String) -> Result<String, String> {
@@ -74,6 +94,25 @@ impl Datastore for FilesystemDatastore {
       .collect();
 
     Ok(dir_content)
+  }
+
+  fn list_backups(&self) -> Result<Vec<Self>, String> {
+    let backup_dir_regex =
+      BACKUP_DIR_REGEX.get_or_init(|| Regex::new(r"\w+_[0-9]+$").expect("invalid regex"));
+    let backups = read_dir(self.base_path.clone())
+      .map_err(|err| format!("Cannot read datastore directory content: {}", err))?
+      .filter_map(Result::ok)
+      .filter_map(|entry| {
+        let name = entry.file_name();
+        let name = name.to_str()?;
+        backup_dir_regex
+          .is_match(name)
+          .then(|| Self::new(entry.path().as_path()))
+      })
+      .filter_map(Result::ok)
+      .collect();
+
+    Ok(backups)
   }
 
   fn put_object(&self, object_name: &str, obj_content: &[u8]) -> Result<(), String> {
