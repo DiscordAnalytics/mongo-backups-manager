@@ -20,6 +20,7 @@ pub struct BackupSchedule {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Backup {
+  pub identifier: String,
   pub display_name: String,
   pub connection_string: String,
   pub database_name: String,
@@ -236,7 +237,7 @@ impl Config {
           return Err(format!("Duplicate backup id: {}", table));
         }
 
-        let backup = Self::parse_backup(&values)?;
+        let backup = Self::parse_backup(table.clone(), &values)?;
 
         if let Some(existing) = used_display_names.get(&backup.display_name) {
           return Err(format!(
@@ -253,12 +254,14 @@ impl Config {
     Ok(())
   }
 
-  fn parse_backup(map: &HashMap<String, TomlValue>) -> Result<Backup, String> {
+  fn parse_backup(table_name: String, map: &HashMap<String, TomlValue>) -> Result<Backup, String> {
     let mut default_schedule = HashMap::new();
     default_schedule.insert(String::from("enabled"), TomlValue::Bool(false));
     default_schedule.insert(String::from("cron"), TomlValue::String(String::new()));
+    let backup_identifier = table_name.split(".").last().unwrap().to_string();
 
     Ok(Backup {
+      identifier: backup_identifier,
       display_name: map
         .get("display_name")
         .ok_or("missing display_name")?
@@ -493,6 +496,7 @@ encryption_key = "azertyuiop""#;
     expected_backups
       .entry("backup.cool".to_string())
       .insert_entry(Backup {
+        identifier: String::from("cool"),
         display_name: String::from("Cool Backup"),
         connection_string: String::from("mongodb://root:password@mongodb.example.com/"),
         database_name: String::from("database"),

@@ -31,9 +31,9 @@ struct DatabaseCollectionHeader {
 }
 
 #[derive(Deserialize, Serialize)]
-struct DatabaseMetadata {
-  name: String,
-  collection_hashes: HashMap<String, String>,
+pub struct DatabaseMetadata {
+  pub name: String,
+  pub collection_hashes: HashMap<String, String>,
 }
 
 pub struct Daemon;
@@ -72,6 +72,7 @@ impl Daemon {
               return;
             }
           };
+
           loop {
             let now = Local::now();
             if now.timestamp() == next.clone().timestamp().as_second() {
@@ -158,10 +159,8 @@ impl Daemon {
       .await
       .map_err(|e| format!("Failed to fetch collections: {e}"))?;
     let backup_timestamp = Local::now().timestamp();
-    let datastore_path = Path::new(backup.datastore.path.as_str()).join(format!(
-      "backup_{}_{}",
-      backup.database_name, backup_timestamp
-    ));
+    let datastore_path = Path::new(backup.datastore.path.as_str())
+      .join(format!("backup_{}_{}", backup.identifier, backup_timestamp));
     let datastore = match backup.datastore.storage_type {
       BackupDatastoreType::FileSystem => FilesystemDatastore::new(datastore_path.as_path())
         .map_err(|e| format!("Failed to initalize datastore: {e}"))?,
