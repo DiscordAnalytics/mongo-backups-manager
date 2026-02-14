@@ -1,12 +1,16 @@
-use crate::cli::commands::Daemon;
-use crate::datastores::{Datastore, FilesystemDatastore};
-use crate::utils::config::{BackupDatastoreType, Config};
-use crate::utils::logger::Logger;
+use std::{ffi::OsStr, path::Path, process::exit};
+
 use chrono::DateTime;
 use cronexpr::jiff::Zoned;
-use std::ffi::OsStr;
-use std::path::Path;
-use std::process::exit;
+
+use crate::{
+  cli::commands::Daemon,
+  datastores::{Datastore, FilesystemDatastore},
+  utils::{
+    config::{BackupDatastoreType, Config},
+    logger::Logger,
+  },
+};
 
 pub fn inspect(name: String) {
   let config = Config::new();
