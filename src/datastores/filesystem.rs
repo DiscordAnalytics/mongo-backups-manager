@@ -42,10 +42,7 @@ impl Datastore for FilesystemDatastore {
       .map_err(|e| format!("Failed to parse metadata file: {e}"))?;
 
     for (collection, hash) in backup_summary.collection_hashes {
-      let real_hash = match self.get_object_hash(format!("{collection}.json")) {
-        Ok(value) => Some(value),
-        Err(_) => None,
-      };
+      let real_hash = self.get_object_hash(format!("{collection}.json")).ok();
 
       if real_hash.is_none_or(|value| value != hash) {
         return Ok(false);

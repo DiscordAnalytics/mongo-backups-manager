@@ -10,7 +10,7 @@ use crate::{
 pub fn list() {
   let config = Config::new();
 
-  if config.backups.len() == 0 {
+  if config.backups.is_empty() {
     println!("No backup jobs found")
   }
 
