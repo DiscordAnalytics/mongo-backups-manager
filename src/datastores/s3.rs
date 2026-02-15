@@ -12,6 +12,7 @@ pub struct S3Datastore {
   pub base_path: PathBuf,
 }
 
+#[allow(unused)]
 impl DatastoreTrait for S3Datastore {
   fn new(base_path: &Path) -> Result<Self, Error> {
     todo!()

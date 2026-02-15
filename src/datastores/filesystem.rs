@@ -154,7 +154,7 @@ impl DatastoreTrait for FilesystemDatastore {
   ) -> Result<Box<dyn AsyncWrite + Unpin + Send>, String> {
     let full_path = self.base_path.join(object_name);
 
-    let _ = self
+    self
       .put_object(object_name, b"")
       .map_err(|e| format!("Failed to create file: {}", e))?;
 

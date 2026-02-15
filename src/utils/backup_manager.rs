@@ -122,7 +122,7 @@ impl BackupJob {
       };
 
       let db = match connection.client() {
-        Some(client) => client.database(&self.database_name.as_str()),
+        Some(client) => client.database(self.database_name.as_str()),
         None => return yield StreamEvent::Error("MongoDB client not initialized".to_string()),
       };
 
