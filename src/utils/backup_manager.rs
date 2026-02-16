@@ -361,45 +361,62 @@ impl BackupJob {
 
         let mut buf_reader = BufReader::new(read_stream);
         
-        // Read the file line by line to find the header and data array start
-        let mut header_lines = Vec::new();
-        let mut found_data_array = false;
-        let mut line = String::new();
+        // Since JSON files are minified (single line), we need to read in chunks
+        // and find the "data":[ position to separate header from documents
+        let mut accumulated = String::new();
+        let mut buffer = vec![0u8; 8192];
+        let data_marker = r#""data":["#;
+        let mut collection_header_opt: Option<DatabaseCollectionHeaderWithoutData> = None;
         
-        // Read lines until we find the "data" field
-        loop {
-          line.clear();
-          match buf_reader.read_line(&mut line).await {
+        // Read chunks until we find the data array marker
+        'header_loop: loop {
+          let bytes_read = match buf_reader.read(&mut buffer).await {
             Ok(0) => break, // EOF
-            Ok(_) => {
-              if line.trim().starts_with("\"data\":") {
-                found_data_array = true;
-                break;
-              }
-              header_lines.push(line.clone());
-            }
+            Ok(n) => n,
             Err(err) => {
               yield StreamEvent::Error(format!("Failed to read collection file: {err}"));
-              break; // Break instead of continue to avoid infinite loop
+              break;
             }
+          };
+          
+          let chunk = match std::str::from_utf8(&buffer[..bytes_read]) {
+            Ok(s) => s,
+            Err(_) => {
+              accumulated.push_str(&String::from_utf8_lossy(&buffer[..bytes_read]));
+              continue;
+            }
+          };
+          
+          accumulated.push_str(chunk);
+          
+          // Check if we've found the data array marker
+          if let Some(pos) = accumulated.find(data_marker) {
+            // Extract header part before "data":[
+            let header_part = &accumulated[..pos];
+            
+            // Reconstruct the header JSON by closing the object
+            let mut header_json = header_part.trim_end_matches(&[',', ' ', '\t', '\n', '\r']).to_string();
+            header_json.push('}');
+            
+            collection_header_opt = match serde_json::from_str(&header_json) {
+              Ok(header) => Some(header),
+              Err(err) => {
+                yield StreamEvent::Error(format!("Failed to parse collection header: {err}"));
+                None
+              }
+            };
+            
+            // Keep the remaining data after "data":[ for document parsing
+            let consumed = pos + data_marker.len();
+            accumulated = accumulated[consumed..].to_string();
+            break;
           }
         }
         
-        if !found_data_array {
-          yield StreamEvent::Error("Invalid collection file format: data array not found".to_string());
-          continue;
-        }
-        
-        // Parse the header by reconstructing JSON without data array
-        let mut header_json = header_lines.join("");
-        // Remove trailing comma and whitespace if present
-        header_json = header_json.trim_end_matches(&[',', ' ', '\t', '\n', '\r']).to_string();
-        header_json.push('}');
-        
-        let collection_header: DatabaseCollectionHeaderWithoutData = match serde_json::from_str(&header_json) {
-          Ok(header) => header,
-          Err(err) => {
-            yield StreamEvent::Error(format!("Failed to parse collection header: {err}"));
+        let collection_header = match collection_header_opt {
+          Some(header) => header,
+          None => {
+            yield StreamEvent::Error("Failed to parse collection header or data array not found".to_string());
             continue;
           }
         };
@@ -433,14 +450,73 @@ impl BackupJob {
         if total_docs > 0 {
           let mut inserted = 0u64;
           let mut document_batch: Vec<Document> = Vec::new();
-          let mut in_array = false;
           let mut brace_depth = 0;
           let mut current_doc = String::new();
           let mut should_stop = false;
           
+          // Start with the accumulated data from header parsing (after "data":[)
+          let mut leftover = accumulated;
+          
+          // Process leftover first if it has any content
+          if !leftover.is_empty() {
+            for ch in leftover.chars() {
+              match ch {
+                '{' => {
+                  brace_depth += 1;
+                  current_doc.push(ch);
+                }
+                '}' => {
+                  current_doc.push(ch);
+                  brace_depth -= 1;
+                  
+                  // Complete document found
+                  if brace_depth == 0 && !current_doc.trim().is_empty() {
+                    match serde_json::from_str::<Document>(&current_doc) {
+                      Ok(doc) => {
+                        document_batch.push(doc);
+                        
+                        // Insert batch when it reaches the batch size
+                        if document_batch.len() >= DOCUMENTS_BATCH_SIZE as usize {
+                          if let Err(err) = collection.insert_many(&document_batch).await {
+                            yield StreamEvent::Error(format!("Failed to insert documents: {err}"));
+                            should_stop = true;
+                            break;
+                          }
+                          inserted += document_batch.len() as u64;
+                          yield StreamEvent::Info(format!("Inserted {}/{} documents", inserted, total_docs));
+                          document_batch.clear();
+                        }
+                      }
+                      Err(err) => {
+                        yield StreamEvent::Error(format!("Failed to parse document: {err}"));
+                      }
+                    }
+                    current_doc.clear();
+                  }
+                }
+                ']' if brace_depth == 0 => {
+                  // End of array - we're done
+                  should_stop = true;
+                  break;
+                }
+                _ => {
+                  if brace_depth > 0 {
+                    current_doc.push(ch);
+                  }
+                }
+              }
+            }
+            
+            // Save incomplete document for next iteration
+            if brace_depth > 0 && !current_doc.is_empty() {
+              leftover = std::mem::take(&mut current_doc);
+            } else {
+              leftover.clear();
+            }
+          }
+          
           // Read in chunks to avoid loading entire file
           let mut buffer = vec![0u8; 8192]; // 8KB chunks
-          let mut leftover = String::new();
           
           'read_loop: loop {
             if should_stop {
@@ -477,10 +553,6 @@ impl BackupJob {
             
             for ch in text.chars() {
               match ch {
-                '[' if !in_array => {
-                  in_array = true;
-                  continue;
-                }
                 '{' => {
                   brace_depth += 1;
                   current_doc.push(ch);
@@ -519,10 +591,8 @@ impl BackupJob {
                   break 'read_loop;
                 }
                 _ => {
-                  if brace_depth > 0 || (in_array && ch == ',') {
-                    if brace_depth > 0 {
-                      current_doc.push(ch);
-                    }
+                  if brace_depth > 0 {
+                    current_doc.push(ch);
                   }
                 }
               }
