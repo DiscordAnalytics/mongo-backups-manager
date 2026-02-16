@@ -11,7 +11,7 @@ use mongodb::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::utils::config::BackupDatastore;
 use crate::{
@@ -277,9 +277,35 @@ impl BackupJob {
     self.encryption_key.is_some()
   }
 
-  pub fn restore_backup_to_database(&self, backup_dir: String) -> impl Stream<Item = StreamEvent> {
+  pub fn restore_backup_to_database(&self, backup_dir: String, target_database_name: Option<String>) -> impl Stream<Item = StreamEvent> {
     stream! {
       yield StreamEvent::Info(format!("Starting restore from backup directory: {}", backup_dir));
+
+      // Create a datastore instance for the backup directory to check integrity
+      let backup_datastore = match self.datastore {
+        Datastore::FileSystem(ref ds) => {
+          let backup_path = ds.base_path.join(&backup_dir);
+          match FilesystemDatastore::new(backup_path.as_path()) {
+            Ok(store) => Datastore::FileSystem(store),
+            Err(err) => return yield StreamEvent::Error(format!("Failed to create backup datastore: {err}")),
+          }
+        }
+        Datastore::S3(ref ds) => {
+          let backup_path = ds.base_path.join(&backup_dir);
+          match S3Datastore::new(backup_path.as_path()) {
+            Ok(store) => Datastore::S3(store),
+            Err(err) => return yield StreamEvent::Error(format!("Failed to create backup datastore: {err}")),
+          }
+        }
+      };
+
+      // Check backup integrity before restoring
+      yield StreamEvent::Info("Checking backup integrity...".to_string());
+      match backup_datastore.check_backup_integrity() {
+        Ok(true) => yield StreamEvent::Info("Backup integrity check passed".to_string()),
+        Ok(false) => return yield StreamEvent::Error("Backup integrity check failed: corrupted backup".to_string()),
+        Err(err) => return yield StreamEvent::Error(format!("Backup integrity check failed: {err}")),
+      };
 
       // Connect to MongoDB
       let connection = match DatabaseConnection::new().connect(self.connection_string.as_str()).await {
@@ -293,8 +319,8 @@ impl BackupJob {
       };
 
       // Read the metadata file to get database information
-      let metadata_path = format!("{}/.database.json", backup_dir);
-      let metadata_content = match self.datastore.get_object(metadata_path) {
+      let metadata_path = ".database.json".to_string();
+      let metadata_content = match backup_datastore.get_object(metadata_path) {
         Ok(content) => content,
         Err(err) => return yield StreamEvent::Error(format!("Failed to read metadata file: {err}")),
       };
@@ -304,22 +330,33 @@ impl BackupJob {
         Err(err) => return yield StreamEvent::Error(format!("Failed to parse metadata file: {err}")),
       };
 
-      yield StreamEvent::Info(format!("Restoring database: {}", metadata.name));
+      // Use target database name if provided, otherwise use the backup's original database name
+      let target_db_name = target_database_name.unwrap_or_else(|| self.database_name.clone());
+      yield StreamEvent::Info(format!("Restoring database '{}' to '{}'", metadata.name, target_db_name));
 
-      let db = client.database(&self.database_name);
+      let db = client.database(&target_db_name);
 
       // Restore each collection
       for (collection_name, _hash) in metadata.collection_hashes {
         yield StreamEvent::Info(format!("Restoring collection: {}", collection_name));
 
-        let collection_file_path = format!("{}/{}.json", backup_dir, collection_name);
-        let collection_content = match self.datastore.get_object(collection_file_path) {
-          Ok(content) => content,
+        let collection_file_path = format!("{}.json", collection_name);
+        
+        // Use open_read_stream to avoid loading entire collection into memory
+        let mut read_stream = match backup_datastore.open_read_stream(collection_file_path.as_str()).await {
+          Ok(stream) => stream,
           Err(err) => {
-            yield StreamEvent::Error(format!("Failed to read collection file: {err}"));
+            yield StreamEvent::Error(format!("Failed to open collection file: {err}"));
             continue;
           }
         };
+
+        // Read the entire file content in chunks to avoid loading everything at once
+        let mut collection_content = String::new();
+        if let Err(err) = read_stream.read_to_string(&mut collection_content).await {
+          yield StreamEvent::Error(format!("Failed to read collection file: {err}"));
+          continue;
+        }
 
         let collection_header: DatabaseCollectionHeader = match serde_json::from_str(&collection_content) {
           Ok(header) => header,

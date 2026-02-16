@@ -3,7 +3,7 @@ use std::{
   path::{Path, PathBuf},
 };
 
-use tokio::io::AsyncWrite;
+use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::datastores::DatastoreTrait;
 
@@ -49,6 +49,13 @@ impl DatastoreTrait for S3Datastore {
     &self,
     object_name: &str,
   ) -> Result<Box<dyn AsyncWrite + Unpin + Send>, String> {
+    todo!()
+  }
+
+  async fn open_read_stream(
+    &self,
+    object_name: &str,
+  ) -> Result<Box<dyn AsyncRead + Unpin + Send>, String> {
     todo!()
   }
 }

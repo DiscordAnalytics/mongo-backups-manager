@@ -7,7 +7,7 @@ use std::{
 
 use regex::Regex;
 use sha2::{Digest, Sha256};
-use tokio::{fs::File as TokioFile, io::AsyncWrite};
+use tokio::{fs::File as TokioFile, io::{AsyncRead, AsyncWrite}};
 
 use crate::{datastores::DatastoreTrait, utils::backup_manager::DatabaseMetadata};
 
@@ -161,6 +161,19 @@ impl DatastoreTrait for FilesystemDatastore {
     let file = TokioFile::create(full_path)
       .await
       .map_err(|e| format!("Failed to create file: {}", e))?;
+
+    Ok(Box::new(file))
+  }
+
+  async fn open_read_stream(
+    &self,
+    object_name: &str,
+  ) -> Result<Box<dyn AsyncRead + Unpin + Send>, String> {
+    let full_path = self.base_path.join(object_name);
+
+    let file = TokioFile::open(full_path)
+      .await
+      .map_err(|e| format!("Failed to open file: {}", e))?;
 
     Ok(Box::new(file))
   }
