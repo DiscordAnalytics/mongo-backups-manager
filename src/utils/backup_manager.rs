@@ -331,9 +331,11 @@ impl BackupJob {
 
         // Drop the collection if it exists
         let collection: Collection<Document> = db.collection(&collection_name);
-        if let Err(err) = collection.drop().await {
+        if let Err(_) = collection.drop().await {
           // It's okay if the collection doesn't exist
-          yield StreamEvent::Info(format!("Collection {} does not exist (will create new): {}", collection_name, err));
+          yield StreamEvent::Info(format!("Collection {} does not exist, will create new collection", collection_name));
+        } else {
+          yield StreamEvent::Info(format!("Dropped existing collection {}", collection_name));
         }
 
         // Create the collection with options
