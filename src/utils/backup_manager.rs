@@ -11,7 +11,7 @@ use mongodb::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 
 use crate::utils::config::BackupDatastore;
 use crate::{
@@ -29,6 +29,14 @@ struct DatabaseCollectionHeader {
   indexes: Vec<IndexModel>,
   documents_count: u64,
   data: Vec<Document>,
+}
+
+#[derive(Deserialize, Serialize)]
+struct DatabaseCollectionHeaderWithoutData {
+  name: String,
+  options: CreateCollectionOptions,
+  indexes: Vec<IndexModel>,
+  documents_count: u64,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -343,7 +351,7 @@ impl BackupJob {
         let collection_file_path = format!("{}.json", collection_name);
         
         // Use open_read_stream for streaming file access
-        let mut read_stream = match backup_datastore.open_read_stream(collection_file_path.as_str()).await {
+        let read_stream = match backup_datastore.open_read_stream(collection_file_path.as_str()).await {
           Ok(stream) => stream,
           Err(err) => {
             yield StreamEvent::Error(format!("Failed to open collection file: {err}"));
@@ -351,17 +359,49 @@ impl BackupJob {
           }
         };
 
-        // Read the file content for JSON parsing
-        let mut collection_content = String::new();
-        if let Err(err) = read_stream.read_to_string(&mut collection_content).await {
-          yield StreamEvent::Error(format!("Failed to read collection file: {err}"));
+        let mut buf_reader = BufReader::new(read_stream);
+        
+        // Read the file line by line to find the header and data array start
+        let mut header_lines = Vec::new();
+        let mut found_data_array = false;
+        let mut line = String::new();
+        
+        // Read lines until we find the "data" field
+        loop {
+          line.clear();
+          match buf_reader.read_line(&mut line).await {
+            Ok(0) => break, // EOF
+            Ok(_) => {
+              if line.trim().starts_with("\"data\":") {
+                found_data_array = true;
+                break;
+              }
+              header_lines.push(line.clone());
+            }
+            Err(err) => {
+              yield StreamEvent::Error(format!("Failed to read collection file: {err}"));
+              continue;
+            }
+          }
+        }
+        
+        if !found_data_array {
+          yield StreamEvent::Error("Invalid collection file format: data array not found".to_string());
           continue;
         }
-
-        let collection_header: DatabaseCollectionHeader = match serde_json::from_str(&collection_content) {
+        
+        // Parse the header by reconstructing JSON without data array
+        let mut header_json = header_lines.join("");
+        // Remove trailing comma if present
+        if header_json.trim_end().ends_with(',') {
+          header_json = header_json.trim_end().trim_end_matches(',').to_string();
+        }
+        header_json.push('}');
+        
+        let collection_header: DatabaseCollectionHeaderWithoutData = match serde_json::from_str(&header_json) {
           Ok(header) => header,
           Err(err) => {
-            yield StreamEvent::Error(format!("Failed to parse collection file: {err}"));
+            yield StreamEvent::Error(format!("Failed to parse collection header: {err}"));
             continue;
           }
         };
@@ -390,18 +430,115 @@ impl BackupJob {
             continue;
           }
 
-        // Insert documents in batches
-        if !collection_header.data.is_empty() {
-          let total_docs = collection_header.data.len();
-          let mut inserted = 0;
-
-          for chunk in collection_header.data.chunks(DOCUMENTS_BATCH_SIZE as usize) {
-            if let Err(err) = collection.insert_many(chunk).await {
-              yield StreamEvent::Error(format!("Failed to insert documents: {err}"));
-              break;
+        // Stream and insert documents in batches without loading entire file
+        let total_docs = collection_header.documents_count;
+        if total_docs > 0 {
+          let mut inserted = 0u64;
+          let mut document_batch: Vec<Document> = Vec::new();
+          let mut in_array = false;
+          let mut brace_depth = 0;
+          let mut current_doc = String::new();
+          
+          // Read in chunks to avoid loading entire file
+          let mut buffer = vec![0u8; 8192]; // 8KB chunks
+          let mut leftover = String::new();
+          
+          loop {
+            let bytes_read = match buf_reader.read(&mut buffer).await {
+              Ok(0) => {
+                // EOF - process any remaining data
+                if !leftover.is_empty() {
+                  current_doc.push_str(&leftover);
+                }
+                break;
+              }
+              Ok(n) => n,
+              Err(err) => {
+                yield StreamEvent::Error(format!("Failed to read documents: {err}"));
+                break;
+              }
+            };
+            
+            // Convert chunk to string and combine with leftover from previous chunk
+            let chunk = match std::str::from_utf8(&buffer[..bytes_read]) {
+              Ok(s) => s,
+              Err(_) => {
+                // If we can't decode, try to find a valid UTF-8 boundary
+                leftover.push_str(&String::from_utf8_lossy(&buffer[..bytes_read]));
+                continue;
+              }
+            };
+            
+            let text = format!("{}{}", leftover, chunk);
+            leftover.clear();
+            
+            let mut chars = text.chars().peekable();
+            while let Some(ch) = chars.next() {
+              match ch {
+                '[' if !in_array => {
+                  in_array = true;
+                  continue;
+                }
+                '{' => {
+                  brace_depth += 1;
+                  current_doc.push(ch);
+                }
+                '}' => {
+                  current_doc.push(ch);
+                  brace_depth -= 1;
+                  
+                  // Complete document found
+                  if brace_depth == 0 && !current_doc.trim().is_empty() {
+                    match serde_json::from_str::<Document>(&current_doc) {
+                      Ok(doc) => {
+                        document_batch.push(doc);
+                        
+                        // Insert batch when it reaches the batch size
+                        if document_batch.len() >= DOCUMENTS_BATCH_SIZE as usize {
+                          if let Err(err) = collection.insert_many(&document_batch).await {
+                            yield StreamEvent::Error(format!("Failed to insert documents: {err}"));
+                            break;
+                          }
+                          inserted += document_batch.len() as u64;
+                          yield StreamEvent::Info(format!("Inserted {}/{} documents", inserted, total_docs));
+                          document_batch.clear();
+                        }
+                      }
+                      Err(err) => {
+                        yield StreamEvent::Error(format!("Failed to parse document: {err}"));
+                      }
+                    }
+                    current_doc.clear();
+                  }
+                }
+                ']' if brace_depth == 0 => {
+                  // End of array - we're done
+                  break;
+                }
+                _ => {
+                  if brace_depth > 0 || (in_array && ch == ',') {
+                    if brace_depth > 0 {
+                      current_doc.push(ch);
+                    }
+                  }
+                }
+              }
             }
-            inserted += chunk.len();
-            yield StreamEvent::Info(format!("Inserted {}/{} documents", inserted, total_docs));
+            
+            // Save any incomplete document for next chunk
+            if brace_depth > 0 {
+              leftover = current_doc.clone();
+            }
+          }
+          
+          // Insert remaining documents
+          if !document_batch.is_empty() {
+            if let Err(err) = collection.insert_many(&document_batch).await {
+              yield StreamEvent::Error(format!("Failed to insert documents: {err}"));
+            } else {
+              inserted += document_batch.len() as u64;
+              yield StreamEvent::Info(format!("Inserted {}/{} documents", inserted, total_docs));
+            }
           }
         }
 
