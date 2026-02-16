@@ -342,7 +342,7 @@ impl BackupJob {
 
         let collection_file_path = format!("{}.json", collection_name);
         
-        // Use open_read_stream to avoid loading entire collection into memory
+        // Use open_read_stream for streaming file access
         let mut read_stream = match backup_datastore.open_read_stream(collection_file_path.as_str()).await {
           Ok(stream) => stream,
           Err(err) => {
@@ -351,7 +351,7 @@ impl BackupJob {
           }
         };
 
-        // Read the entire file content in chunks to avoid loading everything at once
+        // Read the file content for JSON parsing
         let mut collection_content = String::new();
         if let Err(err) = read_stream.read_to_string(&mut collection_content).await {
           yield StreamEvent::Error(format!("Failed to read collection file: {err}"));
