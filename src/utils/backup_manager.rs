@@ -345,12 +345,11 @@ impl BackupJob {
         let collection: Collection<Document> = db.collection(&collection_header.name);
 
         // Create indexes
-        if !collection_header.indexes.is_empty() {
-          if let Err(err) = collection.create_indexes(collection_header.indexes).await {
+        if !collection_header.indexes.is_empty()
+          && let Err(err) = collection.create_indexes(collection_header.indexes).await {
             yield StreamEvent::Error(format!("Failed to create indexes: {err}"));
             continue;
           }
-        }
 
         // Insert documents in batches
         if !collection_header.data.is_empty() {
