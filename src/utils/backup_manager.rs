@@ -276,4 +276,101 @@ impl BackupJob {
   pub fn is_encryption_enabled(&self) -> bool {
     self.encryption_key.is_some()
   }
+
+  pub fn restore_backup_to_database(&self, backup_dir: String) -> impl Stream<Item = StreamEvent> {
+    stream! {
+      yield StreamEvent::Info(format!("Starting restore from backup directory: {}", backup_dir));
+
+      // Connect to MongoDB
+      let connection = match DatabaseConnection::new().connect(self.connection_string.as_str()).await {
+        Ok(value) => value,
+        Err(err) => return yield StreamEvent::Error(format!("Failed to connect to MongoDB Server: {err}")),
+      };
+
+      let client = match connection.client() {
+        Some(client) => client,
+        None => return yield StreamEvent::Error("MongoDB client not initialized".to_string()),
+      };
+
+      // Read the metadata file to get database information
+      let metadata_path = format!("{}/.database.json", backup_dir);
+      let metadata_content = match self.datastore.get_object(metadata_path) {
+        Ok(content) => content,
+        Err(err) => return yield StreamEvent::Error(format!("Failed to read metadata file: {err}")),
+      };
+
+      let metadata: DatabaseMetadata = match serde_json::from_str(&metadata_content) {
+        Ok(meta) => meta,
+        Err(err) => return yield StreamEvent::Error(format!("Failed to parse metadata file: {err}")),
+      };
+
+      yield StreamEvent::Info(format!("Restoring database: {}", metadata.name));
+
+      let db = client.database(&self.database_name);
+
+      // Restore each collection
+      for (collection_name, _hash) in metadata.collection_hashes {
+        yield StreamEvent::Info(format!("Restoring collection: {}", collection_name));
+
+        let collection_file_path = format!("{}/{}.json", backup_dir, collection_name);
+        let collection_content = match self.datastore.get_object(collection_file_path) {
+          Ok(content) => content,
+          Err(err) => {
+            yield StreamEvent::Error(format!("Failed to read collection file: {err}"));
+            continue;
+          }
+        };
+
+        let collection_header: DatabaseCollectionHeader = match serde_json::from_str(&collection_content) {
+          Ok(header) => header,
+          Err(err) => {
+            yield StreamEvent::Error(format!("Failed to parse collection file: {err}"));
+            continue;
+          }
+        };
+
+        // Drop the collection if it exists
+        let collection: Collection<Document> = db.collection(&collection_header.name);
+        if let Err(err) = collection.drop().await {
+          // It's okay if the collection doesn't exist
+          yield StreamEvent::Info(format!("Collection {} does not exist (will create new): {}", collection_header.name, err));
+        }
+
+        // Create the collection with options
+        if let Err(err) = db.create_collection(&collection_header.name).with_options(collection_header.options).await {
+          yield StreamEvent::Error(format!("Failed to create collection: {err}"));
+          continue;
+        }
+
+        let collection: Collection<Document> = db.collection(&collection_header.name);
+
+        // Create indexes
+        if !collection_header.indexes.is_empty() {
+          if let Err(err) = collection.create_indexes(collection_header.indexes).await {
+            yield StreamEvent::Error(format!("Failed to create indexes: {err}"));
+            continue;
+          }
+        }
+
+        // Insert documents in batches
+        if !collection_header.data.is_empty() {
+          let total_docs = collection_header.data.len();
+          let mut inserted = 0;
+
+          for chunk in collection_header.data.chunks(DOCUMENTS_BATCH_SIZE as usize) {
+            if let Err(err) = collection.insert_many(chunk).await {
+              yield StreamEvent::Error(format!("Failed to insert documents: {err}"));
+              continue;
+            }
+            inserted += chunk.len();
+            yield StreamEvent::Info(format!("Inserted {}/{} documents", inserted, total_docs));
+          }
+        }
+
+        yield StreamEvent::Info(format!("Restored collection: {}", collection_header.name));
+      }
+
+      yield StreamEvent::Info("Restore completed successfully".to_string());
+    }
+  }
 }
