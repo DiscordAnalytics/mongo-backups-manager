@@ -17,7 +17,7 @@ pub trait DatastoreTrait {
   fn check_backup_integrity(&self) -> Result<bool, String>;
   fn get_object(&self, path: String) -> Result<String, String>;
   fn get_object_hash(&self, path: String) -> Result<String, String>;
-  fn list_objects(&self) -> Result<Vec<String>, String>;
+  fn list_objects(&self, path: String) -> Result<Vec<String>, String>;
   fn list_backups(&self) -> Result<Vec<Self>, String>
   where
     Self: Sized;
@@ -58,8 +58,8 @@ impl Datastore {
     delegate_to_datastore!(self, get_object_hash(path))
   }
 
-  pub fn list_objects(&self) -> Result<Vec<String>, String> {
-    delegate_to_datastore!(self, list_objects())
+  pub fn list_objects(&self, path: String) -> Result<Vec<String>, String> {
+    delegate_to_datastore!(self, list_objects(path))
   }
 
   pub fn put_object(&self, object_name: &str, object_content: &[u8]) -> Result<(), String> {

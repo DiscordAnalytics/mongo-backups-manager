@@ -30,7 +30,7 @@ impl DatastoreTrait for S3Datastore {
     todo!()
   }
 
-  fn list_objects(&self) -> Result<Vec<String>, String> {
+  fn list_objects(&self, path: String) -> Result<Vec<String>, String> {
     todo!()
   }
 
