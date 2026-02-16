@@ -330,19 +330,19 @@ impl BackupJob {
         };
 
         // Drop the collection if it exists
-        let collection: Collection<Document> = db.collection(&collection_header.name);
+        let collection: Collection<Document> = db.collection(&collection_name);
         if let Err(err) = collection.drop().await {
           // It's okay if the collection doesn't exist
-          yield StreamEvent::Info(format!("Collection {} does not exist (will create new): {}", collection_header.name, err));
+          yield StreamEvent::Info(format!("Collection {} does not exist (will create new): {}", collection_name, err));
         }
 
         // Create the collection with options
-        if let Err(err) = db.create_collection(&collection_header.name).with_options(collection_header.options).await {
+        if let Err(err) = db.create_collection(&collection_name).with_options(collection_header.options).await {
           yield StreamEvent::Error(format!("Failed to create collection: {err}"));
           continue;
         }
 
-        let collection: Collection<Document> = db.collection(&collection_header.name);
+        let collection: Collection<Document> = db.collection(&collection_name);
 
         // Create indexes
         if !collection_header.indexes.is_empty()
@@ -359,14 +359,14 @@ impl BackupJob {
           for chunk in collection_header.data.chunks(DOCUMENTS_BATCH_SIZE as usize) {
             if let Err(err) = collection.insert_many(chunk).await {
               yield StreamEvent::Error(format!("Failed to insert documents: {err}"));
-              continue;
+              break;
             }
             inserted += chunk.len();
             yield StreamEvent::Info(format!("Inserted {}/{} documents", inserted, total_docs));
           }
         }
 
-        yield StreamEvent::Info(format!("Restored collection: {}", collection_header.name));
+        yield StreamEvent::Info(format!("Restored collection: {}", collection_name));
       }
 
       yield StreamEvent::Info("Restore completed successfully".to_string());
