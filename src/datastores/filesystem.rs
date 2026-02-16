@@ -78,10 +78,10 @@ impl DatastoreTrait for FilesystemDatastore {
     Ok(format!("{:x}", hash))
   }
 
-  fn list_objects(&self) -> Result<Vec<String>, String> {
+  fn list_objects(&self, path: String) -> Result<Vec<String>, String> {
     let backup_file_regex =
       BACKUP_FILE_REGEX.get_or_init(|| Regex::new(r"\.?\w+\.json$").expect("invalid regex"));
-    let dir_content = read_dir(self.base_path.clone())
+    let dir_content = read_dir(self.base_path.clone().join(PathBuf::from(path)))
       .map_err(|err| format!("Cannot read datastore directory content: {}", err))?
       .filter_map(Result::ok)
       .filter_map(|entry| {
@@ -154,7 +154,7 @@ impl DatastoreTrait for FilesystemDatastore {
   ) -> Result<Box<dyn AsyncWrite + Unpin + Send>, String> {
     let full_path = self.base_path.join(object_name);
 
-    let _ = self
+    self
       .put_object(object_name, b"")
       .map_err(|e| format!("Failed to create file: {}", e))?;
 
@@ -311,7 +311,7 @@ mod tests {
       files.push(timestamp);
     }
 
-    let res = datastore.list_objects();
+    let res = datastore.list_objects(".".to_string());
     assert!(res.is_ok());
     let res = res.unwrap();
 
@@ -333,7 +333,7 @@ mod tests {
       let _ = datastore.put_object(file_name.as_str(), b"test");
     }
 
-    let res = datastore.list_objects();
+    let res = datastore.list_objects(".".to_string());
     assert!(res.is_ok());
     let res = res.unwrap();
 

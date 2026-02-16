@@ -12,6 +12,7 @@ pub struct S3Datastore {
   pub base_path: PathBuf,
 }
 
+#[allow(unused)]
 impl DatastoreTrait for S3Datastore {
   fn new(base_path: &Path) -> Result<Self, Error> {
     todo!()
@@ -29,7 +30,7 @@ impl DatastoreTrait for S3Datastore {
     todo!()
   }
 
-  fn list_objects(&self) -> Result<Vec<String>, String> {
+  fn list_objects(&self, path: String) -> Result<Vec<String>, String> {
     todo!()
   }
 

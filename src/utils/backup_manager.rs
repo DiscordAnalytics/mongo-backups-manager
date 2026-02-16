@@ -130,7 +130,7 @@ impl BackupJob {
       };
 
       let db = match connection.client() {
-        Some(client) => client.database(&self.database_name.as_str()),
+        Some(client) => client.database(self.database_name.as_str()),
         None => return yield StreamEvent::Error("MongoDB client not initialized".to_string()),
       };
 
@@ -252,7 +252,7 @@ impl BackupJob {
   }
 
   async fn finalize_backup(&self, db: Database, backup_dir: String) -> Result<(), String> {
-    let collection_files = self.datastore.list_objects()?;
+    let collection_files = self.datastore.list_objects(backup_dir.clone())?;
     let mut collection_hashes: HashMap<String, String> = HashMap::new();
 
     for file in collection_files {
@@ -261,7 +261,9 @@ impl BackupJob {
         .map(|(name, _)| name)
         .unwrap_or(&file)
         .to_string();
-      let file_hash = self.datastore.get_object_hash(file)?;
+      let file_hash = self
+        .datastore
+        .get_object_hash(format!("{}/{file}", backup_dir.clone()))?;
 
       collection_hashes.insert(file_name, file_hash);
     }
