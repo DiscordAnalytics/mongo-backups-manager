@@ -380,7 +380,7 @@ impl BackupJob {
             }
             Err(err) => {
               yield StreamEvent::Error(format!("Failed to read collection file: {err}"));
-              continue;
+              break; // Break instead of continue to avoid infinite loop
             }
           }
         }
@@ -392,10 +392,8 @@ impl BackupJob {
         
         // Parse the header by reconstructing JSON without data array
         let mut header_json = header_lines.join("");
-        // Remove trailing comma if present
-        if header_json.trim_end().ends_with(',') {
-          header_json = header_json.trim_end().trim_end_matches(',').to_string();
-        }
+        // Remove trailing comma and whitespace if present
+        header_json = header_json.trim_end_matches(&[',', ' ', '\t', '\n', '\r']).to_string();
         header_json.push('}');
         
         let collection_header: DatabaseCollectionHeaderWithoutData = match serde_json::from_str(&header_json) {
@@ -438,12 +436,17 @@ impl BackupJob {
           let mut in_array = false;
           let mut brace_depth = 0;
           let mut current_doc = String::new();
+          let mut should_stop = false;
           
           // Read in chunks to avoid loading entire file
           let mut buffer = vec![0u8; 8192]; // 8KB chunks
           let mut leftover = String::new();
           
-          loop {
+          'read_loop: loop {
+            if should_stop {
+              break;
+            }
+            
             let bytes_read = match buf_reader.read(&mut buffer).await {
               Ok(0) => {
                 // EOF - process any remaining data
@@ -472,8 +475,7 @@ impl BackupJob {
             let text = format!("{}{}", leftover, chunk);
             leftover.clear();
             
-            let mut chars = text.chars().peekable();
-            while let Some(ch) = chars.next() {
+            for ch in text.chars() {
               match ch {
                 '[' if !in_array => {
                   in_array = true;
@@ -497,7 +499,8 @@ impl BackupJob {
                         if document_batch.len() >= DOCUMENTS_BATCH_SIZE as usize {
                           if let Err(err) = collection.insert_many(&document_batch).await {
                             yield StreamEvent::Error(format!("Failed to insert documents: {err}"));
-                            break;
+                            should_stop = true;
+                            break 'read_loop;
                           }
                           inserted += document_batch.len() as u64;
                           yield StreamEvent::Info(format!("Inserted {}/{} documents", inserted, total_docs));
@@ -513,7 +516,7 @@ impl BackupJob {
                 }
                 ']' if brace_depth == 0 => {
                   // End of array - we're done
-                  break;
+                  break 'read_loop;
                 }
                 _ => {
                   if brace_depth > 0 || (in_array && ch == ',') {
@@ -526,13 +529,13 @@ impl BackupJob {
             }
             
             // Save any incomplete document for next chunk
-            if brace_depth > 0 {
-              leftover = current_doc.clone();
+            if brace_depth > 0 && !current_doc.is_empty() {
+              leftover = std::mem::take(&mut current_doc);
             }
           }
           
           // Insert remaining documents
-          if !document_batch.is_empty() {
+          if !should_stop && !document_batch.is_empty() {
             if let Err(err) = collection.insert_many(&document_batch).await {
               yield StreamEvent::Error(format!("Failed to insert documents: {err}"));
             } else {
