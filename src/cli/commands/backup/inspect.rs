@@ -97,7 +97,8 @@ pub fn inspect(name: String) {
       None => "Unknown date".to_string(),
     };
     println!(
-      "\t{} - {}",
+      "\t{} - {} - {}",
+      dir_name,
       date,
       if health_state { "Healthy" } else { "Unhealthy" }
     )

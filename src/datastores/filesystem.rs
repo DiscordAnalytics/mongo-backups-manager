@@ -99,7 +99,7 @@ impl DatastoreTrait for FilesystemDatastore {
 
   fn list_backups(&self) -> Result<Vec<Self>, String> {
     let backup_dir_regex =
-      BACKUP_DIR_REGEX.get_or_init(|| Regex::new(r"\w+_[0-9]+$").expect("invalid regex"));
+      BACKUP_DIR_REGEX.get_or_init(|| Regex::new(r"backup_\w+_[0-9]+$").expect("invalid regex"));
     let backups = read_dir(self.base_path.clone())
       .map_err(|err| format!("Cannot read datastore directory content: {}", err))?
       .filter_map(Result::ok)
