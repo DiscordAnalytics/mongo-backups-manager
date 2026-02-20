@@ -72,6 +72,7 @@ impl PartialEq for BackupJob {
 }
 
 impl BackupJob {
+  #[allow(clippy::too_many_arguments)]
   pub fn new(
     identifier: String,
     display_name: String,
@@ -406,10 +407,8 @@ impl BackupJob {
 
           let collection: Collection<Document> = db.collection(collection_name);
 
-          if !header.indexes.is_empty() {
-            if let Err(err) = collection.create_indexes(header.indexes).await {
-              return yield StreamEvent::Error(format!("Failed to create indexes: {err}"));
-            }
+          if !header.indexes.is_empty() && let Err(err) = collection.create_indexes(header.indexes).await {
+            return yield StreamEvent::Error(format!("Failed to create indexes: {err}"));
           }
 
           let data_start = pos + data_marker.len();
