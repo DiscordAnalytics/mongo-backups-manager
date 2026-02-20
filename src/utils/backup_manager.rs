@@ -1,7 +1,8 @@
+use std::{collections::HashMap, path::Path};
+
 use async_stream::stream;
 use chrono::Local;
-use cronexpr::Crontab;
-use cronexpr::jiff::Zoned;
+use cronexpr::{Crontab, jiff::Zoned};
 use futures::{Stream, StreamExt, TryStreamExt};
 use mongodb::{
   Collection, Database, IndexModel,
@@ -10,14 +11,15 @@ use mongodb::{
   results::CollectionSpecification,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::Path};
-use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader};
 
-use crate::utils::config::BackupDatastore;
 use crate::{
   datastores::{Datastore, DatastoreTrait, FilesystemDatastore, S3Datastore},
   db::DatabaseConnection,
-  utils::{config::BackupDatastoreType, logger::StreamEvent},
+  utils::{
+    config::{BackupDatastore, BackupDatastoreType},
+    logger::StreamEvent,
+  },
 };
 
 const DOCUMENTS_BATCH_SIZE: u32 = 1000;
