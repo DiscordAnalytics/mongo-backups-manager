@@ -263,7 +263,7 @@ impl Config {
         .iter()
         .map(|v| v.as_string())
         .collect::<Result<_, _>>()?,
-      Self::parse_schedule(map.get("schedule").ok_or("missing schedule")?)?,
+      Self::parse_schedule(map.get("schedule"))?,
       map
         .get("connection_string")
         .ok_or("missing connection_string")?
@@ -299,18 +299,23 @@ impl Config {
     })
   }
 
-  fn parse_schedule(v: &TomlValue) -> Result<Option<String>, String> {
-    let obj = v.as_object()?;
-    let enabled = obj
-      .get("enabled")
-      .ok_or("missing schedule.enabled")?
-      .as_bool()?;
-    let cron = obj
-      .get("cron")
-      .ok_or("missing schedule.cron")?
-      .as_string()?;
+  fn parse_schedule(v: Option<&TomlValue>) -> Result<Option<String>, String> {
+    if let Some(v) = v
+      && let Ok(obj) = v.as_object()
+    {
+      let enabled = obj
+        .get("enabled")
+        .ok_or("missing schedule.enabled")?
+        .as_bool()?;
+      let cron = obj
+        .get("cron")
+        .ok_or("missing schedule.cron")?
+        .as_string()?;
 
-    Ok(if enabled { Some(cron) } else { None })
+      Ok(if enabled { Some(cron) } else { None })
+    } else {
+      Ok(None)
+    }
   }
 
   fn strip_comment(line: &str) -> String {
