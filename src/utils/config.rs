@@ -458,7 +458,7 @@ display_name = "Cool Backup"
 connection_string = "mongodb://root:password@mongodb.example.com/"
 database_name = "database"
 ignore_collections = [ "GlobalStats" ]
-datastore = { type = "filesystem", path = "/data/mongo-backups" }
+datastore = { type = "filesystem", path = "./backups" }
 schedule = { enabled = true, cron = "0 0 * * *" }
 encryption_key = "azertyuiop""#;
   //const CONFIG_2: &str = r#"[backup.awesome]
