@@ -11,7 +11,7 @@ use mongodb::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader};
 
 use crate::utils::config::BackupDatastore;
 use crate::{
@@ -29,6 +29,14 @@ struct DatabaseCollectionHeader {
   indexes: Vec<IndexModel>,
   documents_count: u64,
   data: Vec<Document>,
+}
+
+#[derive(Deserialize, Serialize)]
+struct DatabaseCollectionHeaderWithoutData {
+  name: String,
+  options: CreateCollectionOptions,
+  indexes: Vec<IndexModel>,
+  documents_count: u64,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -116,14 +124,9 @@ impl BackupJob {
       let current_time = Local::now().timestamp();
       let backup_dir = format!("backup_{}_{}", self.identifier, current_time);
 
-      let connection = match DatabaseConnection::new().connect(self.connection_string.as_str()).await {
-        Ok(value) => value,
-        Err(err) => return yield StreamEvent::Error(format!("Failed to connected to MongoDB Server: {err}")),
-      };
-
-      let db = match connection.client() {
-        Some(client) => client.database(self.database_name.as_str()),
-        None => return yield StreamEvent::Error("MongoDB client not initialized".to_string()),
+      let db = match self.connect_to_mongodb().await {
+        Ok(c) => c.database(self.database_name.as_str()),
+        Err(err) => return yield StreamEvent::Error(err),
       };
 
       let all_collection_names = match db.list_collection_names().await {
@@ -277,5 +280,225 @@ impl BackupJob {
 
   pub fn is_encryption_enabled(&self) -> bool {
     self.encryption_key.is_some()
+  }
+
+  pub fn restore_backup_to_database(
+    &self,
+    backup_dir: String,
+    target_database_name: Option<String>,
+  ) -> impl Stream<Item = StreamEvent> {
+    stream! {
+      yield StreamEvent::Info(format!("Starting restore from backup directory: {}", backup_dir));
+
+      let backup_datastore = match self.create_backup_datastore(&backup_dir) {
+        Ok(store) => store,
+        Err(err) => return yield StreamEvent::Error(err),
+      };
+
+      yield StreamEvent::Info("Checking backup integrity...".to_string());
+      match backup_datastore.check_backup_integrity() {
+        Ok(true) => yield StreamEvent::Info("Backup integrity check passed".to_string()),
+        Ok(false) => return yield StreamEvent::Error("Backup integrity check failed: corrupted backup".to_string()),
+        Err(err) => return yield StreamEvent::Error(format!("Backup integrity check failed: {err}")),
+      };
+
+      let client = match self.connect_to_mongodb().await {
+        Ok(c) => c,
+        Err(err) => return yield StreamEvent::Error(err),
+      };
+
+      let metadata: DatabaseMetadata = match backup_datastore.get_object(".database.json".to_string()) {
+        Ok(content) => match serde_json::from_str(&content) {
+          Ok(meta) => meta,
+          Err(err) => return yield StreamEvent::Error(format!("Failed to parse metadata: {err}")),
+        },
+        Err(err) => return yield StreamEvent::Error(format!("Failed to read metadata: {err}")),
+      };
+
+      let target_db_name = target_database_name.unwrap_or_else(|| self.database_name.clone());
+      yield StreamEvent::Info(format!("Restoring database '{}' to '{}'", metadata.name, target_db_name));
+
+      let db = client.database(&target_db_name);
+
+      for (collection_name, _hash) in metadata.collection_hashes {
+        yield StreamEvent::Info(format!("Restoring collection: {}", collection_name));
+
+        let mut events = Box::pin(self.restore_collection(backup_datastore.clone(), db.clone(), &collection_name));
+        while let Some(event) = events.next().await {
+          yield event;
+        }
+      }
+
+      yield StreamEvent::Info("Restore completed successfully".to_string());
+    }
+  }
+
+  fn create_backup_datastore(&self, backup_dir: &str) -> Result<Datastore, String> {
+    match &self.datastore {
+      Datastore::FileSystem(ds) => {
+        let backup_path = ds.base_path.join(backup_dir);
+        FilesystemDatastore::new(backup_path.as_path())
+          .map(Datastore::FileSystem)
+          .map_err(|e| format!("Failed to create backup datastore: {e}"))
+      }
+      Datastore::S3(ds) => {
+        let backup_path = ds.base_path.join(backup_dir);
+        S3Datastore::new(backup_path.as_path())
+          .map(Datastore::S3)
+          .map_err(|e| format!("Failed to create backup datastore: {e}"))
+      }
+    }
+  }
+
+  async fn connect_to_mongodb(&self) -> Result<mongodb::Client, String> {
+    let connection = DatabaseConnection::new()
+      .connect(&self.connection_string)
+      .await
+      .map_err(|e| format!("Failed to connect to MongoDB: {e}"))?;
+
+    connection
+      .client()
+      .cloned()
+      .ok_or_else(|| "MongoDB client not initialized".to_string())
+  }
+
+  fn restore_collection(
+    &self,
+    backup_datastore: Datastore,
+    db: Database,
+    collection_name: &str,
+  ) -> impl Stream<Item = StreamEvent> {
+    stream! {
+      let read_stream = match backup_datastore.open_read_stream(&format!("{}.json", collection_name)).await {
+        Ok(s) => s,
+        Err(err) => return yield StreamEvent::Error(format!("Failed to open collection file: {err}")),
+      };
+
+      let mut reader = BufReader::new(read_stream);
+      let mut buffer = String::new();
+      let mut chunk = vec![0u8; 64 * 1024];
+
+      let data_marker = "\"data\":[";
+      loop {
+        match reader.read(&mut chunk).await {
+          Ok(0) => return yield StreamEvent::Error("Invalid backup: missing data array".to_string()),
+          Ok(n) => buffer.push_str(&String::from_utf8_lossy(&chunk[..n])),
+          Err(err) => return yield StreamEvent::Error(format!("Failed to read: {err}")),
+        }
+
+        if let Some(pos) = buffer.find(data_marker) {
+          let header_json = buffer[..pos].trim_end_matches(',');
+          let header_complete = format!("{}}}", header_json);
+
+          let header: DatabaseCollectionHeaderWithoutData = match serde_json::from_str(&header_complete) {
+            Ok(h) => h,
+            Err(err) => return yield StreamEvent::Error(format!("Failed to parse header: {err}")),
+          };
+
+          let collection: Collection<Document> = db.collection(collection_name);
+          let _ = collection.drop().await;
+
+          if let Err(err) = db.create_collection(collection_name).with_options(header.options).await {
+            return yield StreamEvent::Error(format!("Failed to create collection: {err}"));
+          }
+
+          let collection: Collection<Document> = db.collection(collection_name);
+
+          if !header.indexes.is_empty() {
+            if let Err(err) = collection.create_indexes(header.indexes).await {
+              return yield StreamEvent::Error(format!("Failed to create indexes: {err}"));
+            }
+          }
+
+          let data_start = pos + data_marker.len();
+          let remaining = buffer[data_start..].to_string();
+
+          let mut events = Box::pin(Self::stream_documents_from_reader(reader, remaining, collection, header.documents_count));
+          while let Some(event) = events.next().await {
+            yield event;
+          }
+
+          break;
+        }
+      }
+
+      yield StreamEvent::Info(format!("Restored collection: {}", collection_name));
+    }
+  }
+
+  fn stream_documents_from_reader<R: AsyncRead + Unpin + Send + 'static>(
+    mut reader: BufReader<R>,
+    initial_data: String,
+    collection: Collection<Document>,
+    total_docs: u64,
+  ) -> impl Stream<Item = StreamEvent> {
+    stream! {
+      let mut buffer = initial_data;
+      let mut batch: Vec<Document> = Vec::with_capacity(DOCUMENTS_BATCH_SIZE as usize);
+      let mut inserted = 0u64;
+
+      loop {
+        let trimmed_start = buffer.trim_start_matches(|c: char| c == ',' || c.is_whitespace());
+
+        if trimmed_start.starts_with(']') || trimmed_start.is_empty() {
+          let mut chunk = vec![0u8; 64 * 1024];
+          match reader.read(&mut chunk).await {
+            Ok(0) => break, // EOF reached
+            Ok(n) => {
+              buffer = format!("{}{}", trimmed_start, String::from_utf8_lossy(&chunk[..n]));
+              continue;
+            }
+            Err(err) => return yield StreamEvent::Error(format!("Failed to read: {err}")),
+          }
+        }
+
+        let mut deserializer = serde_json::Deserializer::from_str(trimmed_start).into_iter::<Document>();
+        let mut consumed = 0usize;
+        let mut parsed_any = false;
+
+        loop {
+          match deserializer.next() {
+            Some(Ok(doc)) => {
+              consumed = deserializer.byte_offset();
+              parsed_any = true;
+              batch.push(doc);
+
+              if batch.len() >= DOCUMENTS_BATCH_SIZE as usize {
+                if let Err(err) = collection.insert_many(&batch).await {
+                  return yield StreamEvent::Error(format!("Failed to insert documents: {err}"));
+                }
+                inserted += batch.len() as u64;
+                yield StreamEvent::Info(format!("Inserted {}/{} documents", inserted, total_docs));
+                batch.clear();
+              }
+            }
+            Some(Err(_)) => break, // Incomplete JSON, need more data
+            None => break, // No more documents in buffer
+          }
+        }
+
+        // Keep unparsed portion
+        buffer = trimmed_start[consumed..].to_string();
+
+        // If we didn't parse anything, we need more data
+        if !parsed_any || buffer.trim_start_matches(|c: char| c == ',' || c.is_whitespace()).is_empty() {
+          let mut chunk = vec![0u8; 64 * 1024];
+          match reader.read(&mut chunk).await {
+            Ok(0) => break, // EOF
+            Ok(n) => buffer.push_str(&String::from_utf8_lossy(&chunk[..n])),
+            Err(err) => return yield StreamEvent::Error(format!("Failed to read: {err}")),
+          }
+        }
+      }
+
+      // Insert remaining batch
+      if !batch.is_empty() {
+        if let Err(err) = collection.insert_many(&batch).await {
+          return yield StreamEvent::Error(format!("Failed to insert documents: {err}"));
+        }
+        inserted += batch.len() as u64;
+        yield StreamEvent::Info(format!("Inserted {}/{} documents", inserted, total_docs));
+      }
+    }
   }
 }
