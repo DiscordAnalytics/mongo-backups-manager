@@ -488,11 +488,11 @@ encryption_key = "azertyuiop""#;
           String::from("Cool Backup"),
           String::from("database"),
           Vec::from([String::from("GlobalStats")]),
-          Some(String::from("0 0 * * *")),
+          Some(String::from("0 0 * * * Europe/Paris")),
           String::from("mongodb://root:password@mongodb.example.com/"),
           Some(String::from("azertyuiop")),
           BackupDatastore {
-            path: String::from("/data/mongo-backups"),
+            path: String::from("./backups"),
             storage_type: BackupDatastoreType::FileSystem,
           },
         )
