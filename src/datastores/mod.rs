@@ -1,6 +1,6 @@
 use std::{io::Error, path::Path};
 
-use tokio::io::AsyncWrite;
+use tokio::io::{AsyncRead, AsyncWrite};
 
 mod filesystem;
 mod s3;
@@ -27,6 +27,10 @@ pub trait DatastoreTrait {
     &self,
     object_name: &str,
   ) -> Result<Box<dyn AsyncWrite + Unpin + Send>, String>;
+  async fn open_read_stream(
+    &self,
+    object_name: &str,
+  ) -> Result<Box<dyn AsyncRead + Unpin + Send>, String>;
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -77,6 +81,16 @@ impl Datastore {
     match self {
       Datastore::FileSystem(store) => store.open_write_stream(object_name).await,
       Datastore::S3(store) => store.open_write_stream(object_name).await,
+    }
+  }
+
+  pub async fn open_read_stream(
+    &self,
+    object_name: &str,
+  ) -> Result<Box<dyn AsyncRead + Unpin + Send>, String> {
+    match self {
+      Datastore::FileSystem(store) => store.open_read_stream(object_name).await,
+      Datastore::S3(store) => store.open_read_stream(object_name).await,
     }
   }
 }
