@@ -51,10 +51,7 @@ pub fn inspect(name: String) {
       .collect::<Vec<_>>(),
   };
 
-  let datastore_type = match backup_job.datastore {
-    Datastore::FileSystem(_) => "filesystem",
-    Datastore::S3(_) => "s3",
-  };
+  let datastore_type = backup_job.datastore.as_str();
   let datastore_base_path = match backup_job.clone().datastore {
     Datastore::FileSystem(store) => store.base_path.display().to_string(),
     Datastore::S3(store) => store.base_path.display().to_string(),

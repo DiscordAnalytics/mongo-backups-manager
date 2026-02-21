@@ -50,6 +50,13 @@ macro_rules! delegate_to_datastore {
 
 #[allow(unused)]
 impl Datastore {
+  pub fn as_str(&self) -> &'static str {
+    match self {
+      Datastore::FileSystem(_) => "filesystem",
+      Datastore::S3(_) => "s3",
+    }
+  }
+
   pub fn check_backup_integrity(&self) -> Result<bool, String> {
     delegate_to_datastore!(self, check_backup_integrity())
   }
