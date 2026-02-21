@@ -22,7 +22,7 @@ pub fn inspect(name: String) {
   let backups = match &backup_job.datastore {
     Datastore::FileSystem(store) => store
       .list_backups()
-      .unwrap_or_else(|_| Vec::new())
+      .unwrap_or_default()
       .into_iter()
       .filter_map(|store| {
         let dir_name = store.base_path.file_name()?.to_str()?.to_string();
@@ -37,7 +37,7 @@ pub fn inspect(name: String) {
 
     Datastore::S3(store) => store
       .list_backups()
-      .unwrap_or_else(|_| Vec::new())
+      .unwrap_or_default()
       .into_iter()
       .filter_map(|store| {
         let dir_name = store.base_path.file_name()?.to_str()?.to_string();
@@ -52,7 +52,7 @@ pub fn inspect(name: String) {
   };
 
   let datastore_type = backup_job.datastore.as_str();
-  let datastore_base_path = match backup_job.clone().datastore {
+  let datastore_base_path = match &backup_job.datastore {
     Datastore::FileSystem(store) => store.base_path.display().to_string(),
     Datastore::S3(store) => store.base_path.display().to_string(),
   };
