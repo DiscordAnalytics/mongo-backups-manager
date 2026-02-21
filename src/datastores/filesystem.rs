@@ -41,7 +41,7 @@ impl DatastoreTrait for FilesystemDatastore {
   }
 
   fn check_backup_integrity(&self) -> Result<bool, String> {
-    let backup_summary_file = self.get_object(".database.json".to_string())?;
+    let backup_summary_file = self.get_object(".database.json")?;
     let backup_summary = serde_json::from_str::<DatabaseMetadata>(backup_summary_file.as_str())
       .map_err(|e| format!("Failed to parse metadata file: {e}"))?;
 
@@ -56,10 +56,10 @@ impl DatastoreTrait for FilesystemDatastore {
     Ok(true)
   }
 
-  fn get_object(&self, path: String) -> Result<String, String> {
-    let full_path = self.base_path.join(path.as_str());
+  fn get_object(&self, path: impl AsRef<Path>) -> Result<String, String> {
+    let full_path = self.base_path.join(path);
 
-    let mut file = File::open(full_path.display().to_string())
+    let mut file = File::open(&full_path)
       .map_err(|err| format!("Couldn't open file {}: {}", full_path.display(), err))?;
 
     let mut content = String::new();
@@ -70,7 +70,7 @@ impl DatastoreTrait for FilesystemDatastore {
     Ok(content)
   }
 
-  fn get_object_hash(&self, path: String) -> Result<String, String> {
+  fn get_object_hash(&self, path: impl AsRef<Path>) -> Result<String, String> {
     let full_path = self.base_path.join(path);
     let mut file = File::open(full_path).map_err(|e| format!("Failed to open file: {e}"))?;
     let mut sha256 = Sha256::new();
@@ -81,10 +81,10 @@ impl DatastoreTrait for FilesystemDatastore {
     Ok(format!("{:x}", hash))
   }
 
-  fn list_objects(&self, path: String) -> Result<Vec<String>, String> {
+  fn list_objects(&self, path: impl AsRef<Path>) -> Result<Vec<String>, String> {
     let backup_file_regex =
       BACKUP_FILE_REGEX.get_or_init(|| Regex::new(r"\.?\w+\.json$").expect("invalid regex"));
-    let dir_content = read_dir(self.base_path.clone().join(PathBuf::from(path)))
+    let dir_content = read_dir(self.base_path.join(path))
       .map_err(|err| format!("Cannot read datastore directory content: {}", err))?
       .filter_map(Result::ok)
       .filter_map(|entry| {
@@ -100,7 +100,7 @@ impl DatastoreTrait for FilesystemDatastore {
   fn list_backups(&self) -> Result<Vec<Self>, String> {
     let backup_dir_regex =
       BACKUP_DIR_REGEX.get_or_init(|| Regex::new(r"backup_\w+_[0-9]+$").expect("invalid regex"));
-    let backups = read_dir(self.base_path.clone())
+    let backups = read_dir(&self.base_path)
       .map_err(|err| format!("Cannot read datastore directory content: {}", err))?
       .filter_map(Result::ok)
       .filter_map(|entry| {
@@ -123,11 +123,9 @@ impl DatastoreTrait for FilesystemDatastore {
       return Err(format!("File {} already exists", file_path.display()));
     }
 
-    if let Some(parent) = file_path.parent() {
-      create_dir_all(parent).map_err(|e| format!("Failed to create parent directory: {e}"))?;
-    }
+    self.create_parent_dir(&file_path)?;
 
-    let mut file = File::create(file_path.clone())
+    let mut file = File::create(&file_path)
       .map_err(|e| format!("Cannot create file {}: {}", file_path.display(), e))?;
 
     file
@@ -140,7 +138,7 @@ impl DatastoreTrait for FilesystemDatastore {
   fn delete_object(&self, object_name: &str) -> Result<(), String> {
     let file_path = self.base_path.join(object_name);
 
-    remove_file(file_path.clone()).map_err(|e| {
+    remove_file(&file_path).map_err(|e| {
       if e.kind() == ErrorKind::NotFound {
         format!("File {} does not exist", file_path.display())
       } else {
@@ -157,9 +155,7 @@ impl DatastoreTrait for FilesystemDatastore {
   ) -> Result<Box<dyn AsyncWrite + Unpin + Send>, String> {
     let full_path = self.base_path.join(object_name);
 
-    self
-      .put_object(object_name, b"")
-      .map_err(|e| format!("Failed to create file: {}", e))?;
+    self.create_parent_dir(&full_path)?;
 
     let file = TokioFile::create(full_path)
       .await
@@ -179,6 +175,14 @@ impl DatastoreTrait for FilesystemDatastore {
       .map_err(|e| format!("Failed to open file: {}", e))?;
 
     Ok(Box::new(file))
+  }
+
+  fn create_parent_dir(&self, path: &PathBuf) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+      create_dir_all(parent).map_err(|e| format!("Failed to create parent directory: {e}"))?;
+    }
+
+    Ok(())
   }
 }
 
@@ -267,7 +271,7 @@ mod tests {
     let datastore = FilesystemDatastore::new(test_dir_path.as_path()).unwrap();
     let _ = datastore.put_object("test.txt", b"This is the best test :)");
 
-    let res = datastore.get_object("test.txt".to_string());
+    let res = datastore.get_object("test.txt");
     assert!(res.is_ok());
     let res = res.unwrap();
 
@@ -282,7 +286,7 @@ mod tests {
     clean_test_dir(test_dir_path.clone());
     let datastore = FilesystemDatastore::new(test_dir_path.as_path()).unwrap();
 
-    let res = datastore.get_object("test.txt".to_string());
+    let res = datastore.get_object("test.txt");
     assert!(res.is_err());
 
     clean_test_dir(test_dir_path);
@@ -294,7 +298,7 @@ mod tests {
     clean_test_dir(test_dir_path.clone());
     let datastore = FilesystemDatastore::new(test_dir_path.as_path()).unwrap();
 
-    let res = datastore.get_object("".to_string());
+    let res = datastore.get_object("");
     assert!(res.is_err());
 
     clean_test_dir(test_dir_path);
@@ -314,7 +318,7 @@ mod tests {
       files.push(timestamp);
     }
 
-    let res = datastore.list_objects(".".to_string());
+    let res = datastore.list_objects(".");
     assert!(res.is_ok());
     let res = res.unwrap();
 
@@ -336,7 +340,7 @@ mod tests {
       let _ = datastore.put_object(file_name.as_str(), b"test");
     }
 
-    let res = datastore.list_objects(".".to_string());
+    let res = datastore.list_objects(".");
     assert!(res.is_ok());
     let res = res.unwrap();
 

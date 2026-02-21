@@ -22,15 +22,15 @@ impl DatastoreTrait for S3Datastore {
     todo!()
   }
 
-  fn get_object(&self, path: String) -> Result<String, String> {
+  fn get_object(&self, path: impl AsRef<Path>) -> Result<String, String> {
     todo!()
   }
 
-  fn get_object_hash(&self, path: String) -> Result<String, String> {
+  fn get_object_hash(&self, path: impl AsRef<Path>) -> Result<String, String> {
     todo!()
   }
 
-  fn list_objects(&self, path: String) -> Result<Vec<String>, String> {
+  fn list_objects(&self, path: impl AsRef<Path>) -> Result<Vec<String>, String> {
     todo!()
   }
 
@@ -57,6 +57,10 @@ impl DatastoreTrait for S3Datastore {
     &self,
     object_name: &str,
   ) -> Result<Box<dyn AsyncRead + Unpin + Send>, String> {
+    todo!()
+  }
+
+  fn create_parent_dir(&self, path: &PathBuf) -> Result<(), String> {
     todo!()
   }
 }

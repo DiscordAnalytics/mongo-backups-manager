@@ -1,4 +1,7 @@
-use std::{io::Error, path::Path};
+use std::{
+  io::Error,
+  path::{Path, PathBuf},
+};
 
 use tokio::io::{AsyncRead, AsyncWrite};
 
@@ -15,9 +18,9 @@ pub trait DatastoreTrait {
     Self: Sized;
 
   fn check_backup_integrity(&self) -> Result<bool, String>;
-  fn get_object(&self, path: String) -> Result<String, String>;
-  fn get_object_hash(&self, path: String) -> Result<String, String>;
-  fn list_objects(&self, path: String) -> Result<Vec<String>, String>;
+  fn get_object(&self, path: impl AsRef<Path>) -> Result<String, String>;
+  fn get_object_hash(&self, path: impl AsRef<Path>) -> Result<String, String>;
+  fn list_objects(&self, path: impl AsRef<Path>) -> Result<Vec<String>, String>;
   fn list_backups(&self) -> Result<Vec<Self>, String>
   where
     Self: Sized;
@@ -31,6 +34,7 @@ pub trait DatastoreTrait {
     &self,
     object_name: &str,
   ) -> Result<Box<dyn AsyncRead + Unpin + Send>, String>;
+  fn create_parent_dir(&self, path: &PathBuf) -> Result<(), String>;
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -61,15 +65,15 @@ impl Datastore {
     delegate_to_datastore!(self, check_backup_integrity())
   }
 
-  pub fn get_object(&self, path: String) -> Result<String, String> {
+  pub fn get_object(&self, path: impl AsRef<Path>) -> Result<String, String> {
     delegate_to_datastore!(self, get_object(path))
   }
 
-  pub fn get_object_hash(&self, path: String) -> Result<String, String> {
+  pub fn get_object_hash(&self, path: impl AsRef<Path>) -> Result<String, String> {
     delegate_to_datastore!(self, get_object_hash(path))
   }
 
-  pub fn list_objects(&self, path: String) -> Result<Vec<String>, String> {
+  pub fn list_objects(&self, path: impl AsRef<Path>) -> Result<Vec<String>, String> {
     delegate_to_datastore!(self, list_objects(path))
   }
 

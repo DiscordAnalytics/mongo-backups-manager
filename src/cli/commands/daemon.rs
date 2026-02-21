@@ -12,14 +12,18 @@ impl Daemon {
     Log::info(format!("Loaded {} backups from config file", config.backups.len()).as_str());
 
     for (_, backup_job) in config.backups.into_iter() {
-      if backup_job.schedule.is_some() {
+      if backup_job.schedule.is_none() {
+        Log::info(format!("Skipped backup `{}` schedule", backup_job.display_name).as_str());
+      } else {
         let backup_job_clone = backup_job.clone();
         tokio::spawn(async move {
           let mut next = backup_job_clone.get_next_run();
 
           loop {
             let now = Local::now();
-            if next.is_some() && now.timestamp() == next.clone().unwrap().timestamp().as_second() {
+            if let Some(next_run) = &next
+              && now.timestamp() >= next_run.timestamp().as_second()
+            {
               Log::info(
                 format!("Starting backup job `{}`", backup_job_clone.display_name).as_str(),
               );
@@ -57,8 +61,6 @@ impl Daemon {
             Log::error(format!("Failed to get next run for `{}`", backup_job.display_name).as_str())
           }
         }
-      } else {
-        Log::info(format!("Skipped backup `{}` schedule", backup_job.display_name).as_str());
       }
     }
 

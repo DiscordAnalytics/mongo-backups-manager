@@ -310,7 +310,7 @@ impl BackupJob {
         Err(err) => return yield StreamEvent::Error(err),
       };
 
-      let metadata: DatabaseMetadata = match backup_datastore.get_object(".database.json".to_string()) {
+      let metadata: DatabaseMetadata = match backup_datastore.get_object(".database.json") {
         Ok(content) => match serde_json::from_str(&content) {
           Ok(meta) => meta,
           Err(err) => return yield StreamEvent::Error(format!("Failed to parse metadata: {err}")),
