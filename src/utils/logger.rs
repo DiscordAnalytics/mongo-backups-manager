@@ -12,7 +12,7 @@ pub enum StreamEvent {
   Info(String),
 }
 
-pub struct Log {}
+pub struct Log;
 
 impl Log {
   pub fn from_stream_event(event: StreamEvent) {
