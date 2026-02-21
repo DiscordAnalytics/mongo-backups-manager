@@ -220,7 +220,7 @@ impl Config {
           return Err(format!("Duplicate backup id: {}", table));
         }
 
-        let backup = Self::parse_backup(table.clone(), &values)?;
+        let backup = Self::parse_backup(&table, &values)?;
 
         if let Some(existing) = used_display_names.get(&backup.display_name) {
           return Err(format!(
@@ -238,7 +238,7 @@ impl Config {
   }
 
   fn parse_backup(
-    table_name: String,
+    table_name: &String,
     map: &HashMap<String, TomlValue>,
   ) -> Result<BackupJob, String> {
     let mut default_schedule = HashMap::new();
