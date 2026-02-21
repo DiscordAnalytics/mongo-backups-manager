@@ -1,7 +1,4 @@
-use std::{
-  io::Error,
-  path::{Path, PathBuf},
-};
+use std::{io::Error, path::Path};
 
 use tokio::io::{AsyncRead, AsyncWrite};
 
@@ -34,7 +31,7 @@ pub trait DatastoreTrait {
     &self,
     object_name: &str,
   ) -> Result<Box<dyn AsyncRead + Unpin + Send>, String>;
-  fn create_parent_dir(&self, path: &PathBuf) -> Result<(), String>;
+  fn create_parent_dir(&self, path: &Path) -> Result<(), String>;
 }
 
 #[derive(Debug, PartialEq, Clone)]

@@ -177,7 +177,7 @@ impl DatastoreTrait for FilesystemDatastore {
     Ok(Box::new(file))
   }
 
-  fn create_parent_dir(&self, path: &PathBuf) -> Result<(), String> {
+  fn create_parent_dir(&self, path: &Path) -> Result<(), String> {
     if let Some(parent) = path.parent() {
       create_dir_all(parent).map_err(|e| format!("Failed to create parent directory: {e}"))?;
     }

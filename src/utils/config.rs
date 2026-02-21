@@ -237,10 +237,7 @@ impl Config {
     Ok(())
   }
 
-  fn parse_backup(
-    table_name: &String,
-    map: &HashMap<String, TomlValue>,
-  ) -> Result<BackupJob, String> {
+  fn parse_backup(table_name: &str, map: &HashMap<String, TomlValue>) -> Result<BackupJob, String> {
     let mut default_schedule = HashMap::new();
     default_schedule.insert(String::from("enabled"), TomlValue::Bool(false));
     default_schedule.insert(String::from("cron"), TomlValue::String(String::new()));

@@ -179,7 +179,8 @@ impl BackupJob {
     stream! {
       let collection: Collection<Document> = db.collection(collection_specs.name.as_str());
 
-      let mut write_stream = match self.datastore.open_write_stream(format!("{}/{}.json", backup_dir, collection.name()).as_str()).await {
+      let path = format!("{}/{}.json", backup_dir, collection.name());
+      let mut write_stream = match self.datastore.open_write_stream(&path).await {
         Ok(stream) => stream,
         Err(err) => return yield StreamEvent::Error(format!("Failed to open write stream: {err}")),
       };
@@ -250,7 +251,7 @@ impl BackupJob {
   }
 
   async fn finalize_backup(&self, db: Database, backup_dir: String) -> Result<(), String> {
-    let collection_files = self.datastore.list_objects(backup_dir.clone())?;
+    let collection_files = self.datastore.list_objects(&backup_dir)?;
     let mut collection_hashes: HashMap<String, String> = HashMap::new();
 
     for file in collection_files {
@@ -261,7 +262,7 @@ impl BackupJob {
         .to_string();
       let file_hash = self
         .datastore
-        .get_object_hash(format!("{}/{file}", backup_dir.clone()))?;
+        .get_object_hash(Path::new(&backup_dir).join(&file))?;
 
       collection_hashes.insert(file_name, file_hash);
     }
@@ -372,7 +373,8 @@ impl BackupJob {
     collection_name: &str,
   ) -> impl Stream<Item = StreamEvent> {
     stream! {
-      let read_stream = match backup_datastore.open_read_stream(&format!("{}.json", collection_name)).await {
+      let path = format!("{collection_name}.json");
+      let read_stream = match backup_datastore.open_read_stream(&path).await {
         Ok(s) => s,
         Err(err) => return yield StreamEvent::Error(format!("Failed to open collection file: {err}")),
       };

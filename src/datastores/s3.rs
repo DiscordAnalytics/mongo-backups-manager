@@ -60,7 +60,7 @@ impl DatastoreTrait for S3Datastore {
     todo!()
   }
 
-  fn create_parent_dir(&self, path: &PathBuf) -> Result<(), String> {
+  fn create_parent_dir(&self, path: &Path) -> Result<(), String> {
     todo!()
   }
 }
