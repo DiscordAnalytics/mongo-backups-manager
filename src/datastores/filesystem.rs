@@ -102,15 +102,17 @@ impl DatastoreTrait for FilesystemDatastore {
       BACKUP_DIR_REGEX.get_or_init(|| Regex::new(r"backup_\w+_[0-9]+$").expect("invalid regex"));
     let backups = read_dir(&self.base_path)
       .map_err(|err| format!("Cannot read datastore directory content: {}", err))?
-      .filter_map(Result::ok)
       .filter_map(|entry| {
+        let entry = entry.ok()?;
         let name = entry.file_name();
         let name = name.to_str()?;
-        backup_dir_regex
-          .is_match(name)
-          .then(|| Self::new(entry.path().as_path()))
+
+        if !backup_dir_regex.is_match(name) {
+          return None;
+        }
+
+        Self::new(entry.path().as_path()).ok()
       })
-      .filter_map(Result::ok)
       .collect();
 
     Ok(backups)
