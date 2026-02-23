@@ -7,17 +7,22 @@ use std::{
 
 use regex::Regex;
 use sha2::{Digest, Sha256};
-use tokio::{fs::File as TokioFile, io::AsyncWrite};
+use tokio::{
+  fs::File as TokioFile,
+  io::{AsyncRead, AsyncWrite},
+};
 
-use crate::datastores::Datastore;
+use crate::{datastores::DatastoreTrait, utils::backup_manager::DatabaseMetadata};
 
 static BACKUP_FILE_REGEX: OnceLock<Regex> = OnceLock::new();
+static BACKUP_DIR_REGEX: OnceLock<Regex> = OnceLock::new();
 
+#[derive(Debug, PartialEq, Clone)]
 pub struct FilesystemDatastore {
-  base_path: PathBuf,
+  pub base_path: PathBuf,
 }
 
-impl Datastore for FilesystemDatastore {
+impl DatastoreTrait for FilesystemDatastore {
   fn new(base_path: &Path) -> Result<Self, Error> {
     let base_path = base_path.to_path_buf();
 
@@ -35,10 +40,26 @@ impl Datastore for FilesystemDatastore {
     Ok(Self { base_path })
   }
 
-  fn get_object(&self, path: String) -> Result<String, String> {
-    let full_path = self.base_path.join(path.as_str());
+  fn check_backup_integrity(&self) -> Result<bool, String> {
+    let backup_summary_file = self.get_object(".database.json")?;
+    let backup_summary = serde_json::from_str::<DatabaseMetadata>(backup_summary_file.as_str())
+      .map_err(|e| format!("Failed to parse metadata file: {e}"))?;
 
-    let mut file = File::open(full_path.display().to_string())
+    for (collection, hash) in backup_summary.collection_hashes {
+      let real_hash = self.get_object_hash(format!("{collection}.json")).ok();
+
+      if real_hash.is_none_or(|value| value != hash) {
+        return Ok(false);
+      }
+    }
+
+    Ok(true)
+  }
+
+  fn get_object(&self, path: impl AsRef<Path>) -> Result<String, String> {
+    let full_path = self.base_path.join(path);
+
+    let mut file = File::open(&full_path)
       .map_err(|err| format!("Couldn't open file {}: {}", full_path.display(), err))?;
 
     let mut content = String::new();
@@ -49,7 +70,7 @@ impl Datastore for FilesystemDatastore {
     Ok(content)
   }
 
-  fn get_object_hash(&self, path: String) -> Result<String, String> {
+  fn get_object_hash(&self, path: impl AsRef<Path>) -> Result<String, String> {
     let full_path = self.base_path.join(path);
     let mut file = File::open(full_path).map_err(|e| format!("Failed to open file: {e}"))?;
     let mut sha256 = Sha256::new();
@@ -60,10 +81,10 @@ impl Datastore for FilesystemDatastore {
     Ok(format!("{:x}", hash))
   }
 
-  fn list_objects(&self) -> Result<Vec<String>, String> {
+  fn list_objects(&self, path: impl AsRef<Path>) -> Result<Vec<String>, String> {
     let backup_file_regex =
       BACKUP_FILE_REGEX.get_or_init(|| Regex::new(r"\.?\w+\.json$").expect("invalid regex"));
-    let dir_content = read_dir(self.base_path.clone())
+    let dir_content = read_dir(self.base_path.join(path))
       .map_err(|err| format!("Cannot read datastore directory content: {}", err))?
       .filter_map(Result::ok)
       .filter_map(|entry| {
@@ -76,6 +97,27 @@ impl Datastore for FilesystemDatastore {
     Ok(dir_content)
   }
 
+  fn list_backups(&self) -> Result<Vec<Self>, String> {
+    let backup_dir_regex =
+      BACKUP_DIR_REGEX.get_or_init(|| Regex::new(r"backup_\w+_[0-9]+$").expect("invalid regex"));
+    let backups = read_dir(&self.base_path)
+      .map_err(|err| format!("Cannot read datastore directory content: {}", err))?
+      .filter_map(|entry| {
+        let entry = entry.ok()?;
+        let name = entry.file_name();
+        let name = name.to_str()?;
+
+        if !backup_dir_regex.is_match(name) {
+          return None;
+        }
+
+        Self::new(entry.path().as_path()).ok()
+      })
+      .collect();
+
+    Ok(backups)
+  }
+
   fn put_object(&self, object_name: &str, obj_content: &[u8]) -> Result<(), String> {
     let file_path = self.base_path.join(object_name);
 
@@ -83,7 +125,9 @@ impl Datastore for FilesystemDatastore {
       return Err(format!("File {} already exists", file_path.display()));
     }
 
-    let mut file = File::create(file_path.clone())
+    self.create_parent_dir(&file_path)?;
+
+    let mut file = File::create(&file_path)
       .map_err(|e| format!("Cannot create file {}: {}", file_path.display(), e))?;
 
     file
@@ -96,7 +140,7 @@ impl Datastore for FilesystemDatastore {
   fn delete_object(&self, object_name: &str) -> Result<(), String> {
     let file_path = self.base_path.join(object_name);
 
-    remove_file(file_path.clone()).map_err(|e| {
+    remove_file(&file_path).map_err(|e| {
       if e.kind() == ErrorKind::NotFound {
         format!("File {} does not exist", file_path.display())
       } else {
@@ -113,11 +157,34 @@ impl Datastore for FilesystemDatastore {
   ) -> Result<Box<dyn AsyncWrite + Unpin + Send>, String> {
     let full_path = self.base_path.join(object_name);
 
+    self.create_parent_dir(&full_path)?;
+
     let file = TokioFile::create(full_path)
       .await
       .map_err(|e| format!("Failed to create file: {}", e))?;
 
     Ok(Box::new(file))
+  }
+
+  async fn open_read_stream(
+    &self,
+    object_name: &str,
+  ) -> Result<Box<dyn AsyncRead + Unpin + Send>, String> {
+    let full_path = self.base_path.join(object_name);
+
+    let file = TokioFile::open(full_path)
+      .await
+      .map_err(|e| format!("Failed to open file: {}", e))?;
+
+    Ok(Box::new(file))
+  }
+
+  fn create_parent_dir(&self, path: &Path) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+      create_dir_all(parent).map_err(|e| format!("Failed to create parent directory: {e}"))?;
+    }
+
+    Ok(())
   }
 }
 
@@ -132,7 +199,7 @@ mod tests {
   use tokio::io::AsyncWriteExt;
 
   use crate::{
-    datastores::{Datastore, FilesystemDatastore},
+    datastores::{DatastoreTrait, FilesystemDatastore},
     tests::{clean_test_dir, get_test_dir_path},
   };
 
@@ -206,7 +273,7 @@ mod tests {
     let datastore = FilesystemDatastore::new(test_dir_path.as_path()).unwrap();
     let _ = datastore.put_object("test.txt", b"This is the best test :)");
 
-    let res = datastore.get_object("test.txt".to_string());
+    let res = datastore.get_object("test.txt");
     assert!(res.is_ok());
     let res = res.unwrap();
 
@@ -221,7 +288,7 @@ mod tests {
     clean_test_dir(test_dir_path.clone());
     let datastore = FilesystemDatastore::new(test_dir_path.as_path()).unwrap();
 
-    let res = datastore.get_object("test.txt".to_string());
+    let res = datastore.get_object("test.txt");
     assert!(res.is_err());
 
     clean_test_dir(test_dir_path);
@@ -233,7 +300,7 @@ mod tests {
     clean_test_dir(test_dir_path.clone());
     let datastore = FilesystemDatastore::new(test_dir_path.as_path()).unwrap();
 
-    let res = datastore.get_object("".to_string());
+    let res = datastore.get_object("");
     assert!(res.is_err());
 
     clean_test_dir(test_dir_path);
@@ -253,7 +320,7 @@ mod tests {
       files.push(timestamp);
     }
 
-    let res = datastore.list_objects();
+    let res = datastore.list_objects(".");
     assert!(res.is_ok());
     let res = res.unwrap();
 
@@ -275,7 +342,7 @@ mod tests {
       let _ = datastore.put_object(file_name.as_str(), b"test");
     }
 
-    let res = datastore.list_objects();
+    let res = datastore.list_objects(".");
     assert!(res.is_ok());
     let res = res.unwrap();
 

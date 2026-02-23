@@ -1,4 +1,4 @@
 pub mod backup;
-mod daemon;
+pub mod daemon;
 
 pub use daemon::Daemon;
