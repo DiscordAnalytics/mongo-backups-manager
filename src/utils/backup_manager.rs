@@ -257,8 +257,7 @@ impl BackupJob {
     for file in collection_files {
       let file_name = file
         .split_once('.')
-        .map(|(name, _)| name)
-        .unwrap_or(&file)
+        .map_or(file.as_str(), |(name, _)| name)
         .to_string();
       let file_hash = self
         .datastore
