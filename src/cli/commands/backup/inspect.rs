@@ -84,10 +84,9 @@ pub fn inspect(name: String) {
   for (dir_name, datastore) in backups {
     let health_state = datastore.check_backup_integrity().is_ok_and(|res| res);
     let timestamp = dir_name
-      .split("_")
-      .last()
-      .unwrap_or("0")
-      .parse::<i64>()
+      .rsplit("_")
+      .next()
+      .and_then(|s| s.parse::<i64>().ok())
       .unwrap_or(0);
     let date = match DateTime::from_timestamp_secs(timestamp) {
       Some(value) => value.to_rfc3339(),
