@@ -24,6 +24,7 @@ pub enum CurrentScreen {
   Settings,
 }
 
+#[allow(unused)]
 pub struct App {
   should_quit: bool,
   pub current_screen: CurrentScreen,

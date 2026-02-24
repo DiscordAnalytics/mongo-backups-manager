@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 enum Color {
   Gray,
   Purple,
@@ -5,9 +7,21 @@ enum Color {
   Red,
 }
 
-pub struct Logger {}
+pub enum StreamEvent {
+  Error(String),
+  Info(String),
+}
 
-impl Logger {
+pub struct Log;
+
+impl Log {
+  pub fn from_stream_event(event: StreamEvent) {
+    match event {
+      StreamEvent::Error(message) => Self::error(message.as_str()),
+      StreamEvent::Info(message) => Self::info(message.as_str()),
+    }
+  }
+
   fn colorize(text: &str, color: Color) -> String {
     let start_char = match color {
       Color::Gray => "\x1B[90m",
@@ -28,9 +42,9 @@ impl Logger {
   fn log(text: &str, color: Option<Color>) {
     println!(
       "{} - {}",
-      Self::colorize(&Logger::get_date(), Color::Gray).as_str(),
+      Self::colorize(&Self::get_date(), Color::Gray).as_str(),
       match color {
-        Some(color) => Self::colorize(&text, color),
+        Some(color) => Self::colorize(text, color),
         None => text.to_string(),
       }
     );

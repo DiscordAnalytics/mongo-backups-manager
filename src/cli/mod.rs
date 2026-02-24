@@ -1,3 +1,5 @@
+pub mod commands;
+
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -9,5 +11,26 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
+  Backup {
+    #[command(subcommand)]
+    action: BackupCommand,
+  },
+  Daemon,
   Tui,
+}
+
+#[derive(Subcommand)]
+pub enum BackupCommand {
+  Inspect {
+    name: String,
+  },
+  List,
+  Restore {
+    name: String,
+    #[arg(short, long)]
+    target: Option<String>,
+  },
+  Start {
+    name: String,
+  },
 }

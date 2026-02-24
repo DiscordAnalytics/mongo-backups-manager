@@ -1,31 +1,16 @@
+use crate::utils::backup_manager::BackupJob;
 use std::{collections::HashMap, env, fs::File, io::Read, path::Path};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum BackupDatastoreType {
   FileSystem,
   S3,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BackupDatastore {
   pub storage_type: BackupDatastoreType,
-  pub path: String,
-}
-
-#[derive(Debug)]
-pub struct BackupSchedule {
-  pub enabled: bool,
-  pub cron: String,
-}
-
-#[derive(Debug)]
-pub struct Backup {
-  pub display_name: String,
-  pub connection_string: String,
-  pub ignore_collections: Vec<String>,
-  pub datastore: BackupDatastore,
-  pub schedule: BackupSchedule,
-  pub encryption_key: Option<String>,
+  pub(crate) path: String,
 }
 
 #[derive(Debug)]
@@ -38,6 +23,7 @@ enum TomlValue {
   Array(Vec<TomlValue>),
 }
 
+#[allow(unused)]
 impl TomlValue {
   fn type_name(&self) -> &'static str {
     match self {
@@ -142,7 +128,7 @@ enum Frame {
 
 #[derive(Debug)]
 pub struct Config {
-  pub backups: HashMap<String, Backup>,
+  pub backups: HashMap<String, BackupJob>,
 }
 
 impl Config {
@@ -186,6 +172,9 @@ impl Config {
 
       if line.starts_with('[') && line.ends_with(']') {
         table = line[1..line.len() - 1].to_string();
+        if result.contains_key(&table) {
+          return Err(format!("Duplicate table definition: [{}]", table));
+        }
         result.insert(table.clone(), HashMap::new());
         continue;
       }
@@ -224,9 +213,23 @@ impl Config {
       }
     }
 
+    let mut used_display_names = HashMap::<String, String>::new();
     for (table, values) in result {
       if table.starts_with("backup.") {
-        let backup = Self::parse_backup(&values)?;
+        if self.backups.contains_key(&table) {
+          return Err(format!("Duplicate backup id: {}", table));
+        }
+
+        let backup = Self::parse_backup(&table, &values)?;
+
+        if let Some(existing) = used_display_names.get(&backup.display_name) {
+          return Err(format!(
+            "Duplicate backup display_name '{}' (used by '{}' and '{}')",
+            backup.display_name, existing, table
+          ));
+        }
+
+        used_display_names.insert(backup.display_name.clone(), table.clone());
         self.backups.insert(table, backup);
       }
     }
@@ -234,30 +237,42 @@ impl Config {
     Ok(())
   }
 
-  fn parse_backup(map: &HashMap<String, TomlValue>) -> Result<Backup, String> {
-    Ok(Backup {
-      display_name: map
+  fn parse_backup(table_name: &str, map: &HashMap<String, TomlValue>) -> Result<BackupJob, String> {
+    let mut default_schedule = HashMap::new();
+    default_schedule.insert(String::from("enabled"), TomlValue::Bool(false));
+    default_schedule.insert(String::from("cron"), TomlValue::String(String::new()));
+    let backup_identifier = table_name.split(".").last().unwrap().to_string();
+
+    let job = BackupJob::new(
+      backup_identifier,
+      map
         .get("display_name")
         .ok_or("missing display_name")?
         .as_string()?,
-      connection_string: map
-        .get("connection_string")
-        .ok_or("missing connection_string")?
+      map
+        .get("database_name")
+        .ok_or("missing database_name")?
         .as_string()?,
-      ignore_collections: map
+      map
         .get("ignore_collections")
-        .ok_or("missing ignore_collections")?
+        .unwrap_or(&TomlValue::Array(vec![]))
         .as_array()?
         .iter()
         .map(|v| v.as_string())
         .collect::<Result<_, _>>()?,
-      datastore: Self::parse_datastore(map.get("datastore").ok_or("missing datastore")?)?,
-      schedule: Self::parse_schedule(map.get("schedule").ok_or("missing schedule")?)?,
-      encryption_key: map
+      Self::parse_schedule(map.get("schedule"))?,
+      map
+        .get("connection_string")
+        .ok_or("missing connection_string")?
+        .as_string()?,
+      map
         .get("encryption_key")
         .map(|v| v.as_string())
         .transpose()?,
-    })
+      Self::parse_datastore(map.get("datastore").ok_or("missing datastore")?)?,
+    )?;
+
+    Ok(job)
   }
 
   fn parse_datastore(v: &TomlValue) -> Result<BackupDatastore, String> {
@@ -281,18 +296,23 @@ impl Config {
     })
   }
 
-  fn parse_schedule(v: &TomlValue) -> Result<BackupSchedule, String> {
-    let obj = v.as_object()?;
-    Ok(BackupSchedule {
-      enabled: obj
+  fn parse_schedule(v: Option<&TomlValue>) -> Result<Option<String>, String> {
+    if let Some(v) = v
+      && let Ok(obj) = v.as_object()
+    {
+      let enabled = obj
         .get("enabled")
         .ok_or("missing schedule.enabled")?
-        .as_bool()?,
-      cron: obj
+        .as_bool()?;
+      let cron = obj
         .get("cron")
         .ok_or("missing schedule.cron")?
-        .as_string()?,
-    })
+        .as_string()?;
+
+      Ok(if enabled { Some(cron) } else { None })
+    } else {
+      Ok(None)
+    }
   }
 
   fn strip_comment(line: &str) -> String {
@@ -345,7 +365,7 @@ impl Config {
       match c {
         '"' => {
           let mut s = String::new();
-          while let Some(ch) = chars.next() {
+          for ch in chars.by_ref() {
             if ch == '"' {
               break;
             }
@@ -427,4 +447,108 @@ impl Config {
       stack.push(Frame::Array(vec![value]));
     }
   }
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::utils::backup_manager::BackupJob;
+  use crate::utils::config::{BackupDatastore, BackupDatastoreType, Config};
+  use std::{collections::HashMap, fs::write};
+
+  const CONFIG_1: &str = r#"[backup.cool]
+display_name = "Cool Backup"
+connection_string = "mongodb://root:password@mongodb.example.com/"
+database_name = "database"
+ignore_collections = [ "GlobalStats" ]
+datastore = { type = "filesystem", path = "./backups" }
+schedule = { enabled = true, cron = "0 0 * * * Europe/Paris" }
+encryption_key = "azertyuiop""#;
+  //const CONFIG_2: &str = r#"[backup.awesome]
+  //display_name = "Awesome Backup"
+  //connection_string = "mongodb://root:password@mongodb.awesome.com/"
+  //database_name = "database"
+  //ignore_collections = [ "Collection123" ]
+  //datastore = { type = "s3", path = "/backups-dir" }
+  //schedule = { enabled = true, cron = "0 */5 * * *" }
+  //encryption_key = "poiuytreza""#;
+
+  #[test]
+  fn config_parse_config() {
+    let _ = write("./config.toml", CONFIG_1);
+    let config = Config::new();
+    let mut expected_backups: HashMap<String, BackupJob> = HashMap::new();
+    expected_backups
+      .entry("backup.cool".to_string())
+      .insert_entry(
+        BackupJob::new(
+          String::from("cool"),
+          String::from("Cool Backup"),
+          String::from("database"),
+          Vec::from([String::from("GlobalStats")]),
+          Some(String::from("0 0 * * * Europe/Paris")),
+          String::from("mongodb://root:password@mongodb.example.com/"),
+          Some(String::from("azertyuiop")),
+          BackupDatastore {
+            path: String::from("./backups"),
+            storage_type: BackupDatastoreType::FileSystem,
+          },
+        )
+        .unwrap(),
+      );
+
+    for (key, _) in expected_backups.iter() {
+      assert_eq!(config.backups.get(key), expected_backups.get(key))
+    }
+  }
+
+  /*#[test]
+  fn config_parse_config_multiple_backups() {
+    let _ = write("./config.toml", format!("{CONFIG_1}\n\n{CONFIG_2}"));
+    let config = Config::new();
+    let mut expected_backups: HashMap<String, Backup> = HashMap::new();
+    expected_backups
+      .entry("backup.cool".to_string())
+      .insert_entry(Backup {
+        display_name: String::from("Cool Backup"),
+        connection_string: String::from("mongodb://root:password@mongodb.example.com/"),
+        database_name: String::from("database"),
+        ignore_collections: Vec::from([String::from("GlobalStats")]),
+        datastore: BackupDatastore {
+          path: String::from("/data/mongo-backups"),
+          storage_type: BackupDatastoreType::FileSystem,
+        },
+        schedule: BackupSchedule {
+          enabled: true,
+          cron: String::from("0 0 * * *"),
+        },
+        encryption_key: Some(String::from("azertyuiop")),
+      });
+    expected_backups
+      .entry("backup.awesome".to_string())
+      .insert_entry(Backup {
+        display_name: String::from("Awesome Backup"),
+        connection_string: String::from("mongodb://root:password@mongodb.awesome.com/database"),
+        ignore_collections: Vec::from([String::from("Collection123")]),
+        datastore: BackupDatastore {
+          path: String::from("/backups-dir"),
+          storage_type: BackupDatastoreType::S3,
+        },
+        schedule: BackupSchedule {
+          enabled: true,
+          cron: String::from("0 *\/5 * * *"),
+        },
+        encryption_key: Some(String::from("poiuytreza")),
+      });
+
+    for (key, _) in expected_backups.iter() {
+      assert_eq!(config.backups.get(key), expected_backups.get(key))
+    }
+  }
+
+  #[test]
+  #[should_panic]
+  fn config_parse_config_unknown_file() {
+    let _ = remove_file("./config.toml");
+    let _ = Config::new();
+  }*/
 }

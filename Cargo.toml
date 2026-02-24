@@ -12,9 +12,7 @@ name = "mbm"
 path = "src/main.rs"
 
 [dependencies]
-chacha20poly1305 = { version = "0.10.1", default-features = false, features = [
-  "getrandom",
-] }
+async-stream = { version = "0.3.6", default-features = false }
 chrono = { version = "0.4.43", default-features = false, features = ["clock"] }
 clap = { version = "4.5.54", default-features = false, features = [
   "derive",
@@ -32,8 +30,13 @@ mongodb = { version = "3.5.0", default-features = false, features = [
 ratatui = { version = "0.30.0", default-features = false, features = [
   "crossterm",
 ] }
-tokio = { version = "1.49.0", features = ["full"] }
+cronexpr = "1.4.0"
+futures = { version = "0.3.31", default-features = false }
 regex = "1.12.2"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.149", default-features = false, features = ["std"] }
+sha2 = { version = "0.10.9", default-features = false }
+tokio = { version = "1.49.0", features = ["full"] }
 
 [profile.release]
 opt-level = "z"

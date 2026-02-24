@@ -4,12 +4,12 @@ use ratatui::Frame;
 
 use crate::ui::{app::App, screens::ScreenLayout};
 
-pub struct SettingsScreen;
+pub struct DatabasesScreen;
 
 #[allow(unused)]
-impl SettingsScreen {
+impl DatabasesScreen {
   pub fn draw(app: &mut App, frame: &mut Frame) -> Result<()> {
-    ScreenLayout::draw(app, frame, Some("Settings"));
+    ScreenLayout::draw(frame, Some("Databases"));
 
     Ok(())
   }
