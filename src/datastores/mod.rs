@@ -58,6 +58,13 @@ impl Datastore {
     }
   }
 
+  pub fn get_base_path(&self) -> String {
+    match self {
+      Datastore::FileSystem(store) => store.base_path.display().to_string(),
+      Datastore::S3(store) => store.base_path.display().to_string(),
+    }
+  }
+
   pub fn check_backup_integrity(&self) -> Result<bool, String> {
     delegate_to_datastore!(self, check_backup_integrity())
   }
