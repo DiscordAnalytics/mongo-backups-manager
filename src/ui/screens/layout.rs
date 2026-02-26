@@ -24,9 +24,11 @@ impl ScreenLayout {
       .title_alignment(HorizontalAlignment::Left);
     let hint_text = format!(
       "Esc or q to exit{}",
-      (app.current_screen != CurrentScreen::Main)
-        .then(|| ", Backspace to go back")
-        .unwrap_or("")
+      if app.current_screen != CurrentScreen::Main {
+        ", Backspace to go back"
+      } else {
+        ""
+      }
     );
     let action_hint = Block::new().title_bottom(Line::from(hint_text).centered());
 

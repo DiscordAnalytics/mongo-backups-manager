@@ -17,8 +17,8 @@ impl BackupsScreen {
 
     let backups = &app.config.backups;
     let backup_names = backups
-      .iter()
-      .map(|(_, v)| v.display_name.clone())
+      .values()
+      .map(|v| v.display_name.clone())
       .collect::<Vec<_>>();
 
     let area = frame.area();
@@ -42,5 +42,13 @@ impl BackupsScreen {
     frame.render_stateful_widget(list, layout[0], &mut app.list_state);
 
     Ok(())
+  }
+
+  pub fn list_items(app: &mut App) -> Vec<String> {
+    let backups = &app.config.backups;
+    backups
+      .values()
+      .map(|v| v.identifier.clone())
+      .collect::<Vec<_>>()
   }
 }

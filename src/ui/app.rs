@@ -11,6 +11,9 @@ use ratatui::{
   widgets::ListState,
 };
 
+use crate::ui::app::CurrentScreen::BackupInspect;
+use crate::ui::screens::BackupInspectScreen;
+use crate::utils::backup_manager::BackupJob;
 use crate::{
   db::DatabaseConnection,
   ui::screens::{BackupsScreen, HomeItem, HomeScreen, SettingsScreen},
@@ -21,6 +24,7 @@ use crate::{
 pub enum CurrentScreen {
   Main,
   Backups,
+  BackupInspect { backup: BackupJob },
   Settings,
 }
 
@@ -34,7 +38,8 @@ pub struct App {
 }
 
 impl App {
-  pub fn new(config: Config) -> Self {
+  pub fn new() -> Self {
+    let config = Config::new();
     let mut list_state = ListState::default();
     list_state.select_first();
     Self {
@@ -64,6 +69,11 @@ impl App {
         CurrentScreen::Backups => {
           if let Err(e) = BackupsScreen::draw(self, frame) {
             eprintln!("Draw error: {}", e);
+          }
+        }
+        CurrentScreen::BackupInspect { ref backup } => {
+          if let Err(e) = BackupInspectScreen::draw(self, backup.clone(), frame) {
+            eprintln!("Draw error: {}", e)
           }
         }
         CurrentScreen::Settings => {
@@ -114,6 +124,19 @@ impl App {
             HomeItem::Settings => self.set_screen(CurrentScreen::Settings),
             HomeItem::Exit => self.should_quit = true,
           }
+        }
+      }
+      (CurrentScreen::Backups, KeyCode::Enter) => {
+        let items = BackupsScreen::list_items(self);
+        if let Some(idx) = self.list_state.selected() {
+          let backup = self
+            .config
+            .backups
+            .get(&format!("backup.{}", items[idx]))
+            .expect("Backup not found");
+          self.set_screen(CurrentScreen::BackupInspect {
+            backup: backup.clone(),
+          })
         }
       }
       (CurrentScreen::Backups | CurrentScreen::Settings, KeyCode::Backspace) => {
