@@ -1,5 +1,4 @@
-use std::io;
-
+use chrono::DateTime;
 use ratatui::{
   Terminal,
   crossterm::{
@@ -10,7 +9,9 @@ use ratatui::{
   prelude::CrosstermBackend,
   widgets::ListState,
 };
+use std::io;
 
+use crate::datastores::Datastore;
 use crate::ui::app::CurrentScreen::BackupInspect;
 use crate::ui::screens::BackupInspectScreen;
 use crate::utils::backup_manager::BackupJob;
@@ -110,12 +111,14 @@ impl App {
     }
 
     match (&self.current_screen, key.code) {
-      (CurrentScreen::Main | CurrentScreen::Backups, KeyCode::Down) => {
-        self.list_state.select_next()
-      }
-      (CurrentScreen::Main | CurrentScreen::Backups, KeyCode::Up) => {
-        self.list_state.select_previous()
-      }
+      (
+        CurrentScreen::Main | CurrentScreen::Backups | CurrentScreen::BackupInspect { backup: _ },
+        KeyCode::Down,
+      ) => self.list_state.select_next(),
+      (
+        CurrentScreen::Main | CurrentScreen::Backups | CurrentScreen::BackupInspect { backup: _ },
+        KeyCode::Up,
+      ) => self.list_state.select_previous(),
       (CurrentScreen::Main, KeyCode::Enter) => {
         let items = HomeScreen::list_items();
         if let Some(idx) = self.list_state.selected() {
