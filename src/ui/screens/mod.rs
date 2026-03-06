@@ -1,10 +1,13 @@
-mod databases;
-pub use databases::DatabasesScreen;
+mod backups;
+pub use backups::BackupsScreen;
 mod home;
 pub use home::{HomeItem, HomeScreen};
 mod layout;
 pub use layout::ScreenLayout;
+mod backup_inspect;
+pub use backup_inspect::BackupInspectScreen;
 mod settings;
+
 pub use settings::SettingsScreen;
 
 use ratatui::{

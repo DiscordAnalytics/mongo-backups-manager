@@ -19,48 +19,12 @@ pub fn inspect(name: String) {
   };
 
   let backup_dir_prefix = format!("backup_{name}_");
-  let backups = match &backup_job.datastore {
-    Datastore::FileSystem(store) => store
-      .list_backups()
-      .unwrap_or_default()
-      .into_iter()
-      .filter_map(|store| {
-        let dir_name = store.base_path.file_name()?.to_str()?.to_string();
-
-        if dir_name.starts_with(&backup_dir_prefix) {
-          Some((dir_name, Datastore::FileSystem(store)))
-        } else {
-          None
-        }
-      })
-      .collect::<Vec<_>>(),
-
-    Datastore::S3(store) => store
-      .list_backups()
-      .unwrap_or_default()
-      .into_iter()
-      .filter_map(|store| {
-        let dir_name = store.base_path.file_name()?.to_str()?.to_string();
-
-        if dir_name.starts_with(&backup_dir_prefix) {
-          Some((dir_name, Datastore::S3(store)))
-        } else {
-          None
-        }
-      })
-      .collect::<Vec<_>>(),
-  };
-
-  let datastore_type = backup_job.datastore.as_str();
-  let datastore_base_path = match &backup_job.datastore {
-    Datastore::FileSystem(store) => store.base_path.display().to_string(),
-    Datastore::S3(store) => store.base_path.display().to_string(),
-  };
+  let backups = backup_job.datastore.get_backups(&name);
 
   println!("-- {} --", backup_job.display_name);
   println!("Datastore:");
-  println!("\tType: {}", datastore_type);
-  println!("\tPath: {}", datastore_base_path);
+  println!("\tType: {}", backup_job.datastore.as_str());
+  println!("\tPath: {}", backup_job.datastore.get_base_path());
   println!(
     "Schedule: {:?}",
     if let Some(schedule) = backup_job.clone().raw_schedule {

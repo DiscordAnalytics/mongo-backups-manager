@@ -1,5 +1,4 @@
-use std::io;
-
+use chrono::DateTime;
 use ratatui::{
   Terminal,
   crossterm::{
@@ -10,34 +9,45 @@ use ratatui::{
   prelude::CrosstermBackend,
   widgets::ListState,
 };
+use std::io;
 
+use crate::datastores::Datastore;
+use crate::ui::app::CurrentScreen::BackupInspect;
+use crate::ui::screens::BackupInspectScreen;
+use crate::utils::backup_manager::BackupJob;
 use crate::{
   db::DatabaseConnection,
-  ui::screens::{DatabasesScreen, HomeItem, HomeScreen, SettingsScreen},
+  ui::screens::{BackupsScreen, HomeItem, HomeScreen, SettingsScreen},
+  utils::config::Config,
 };
 
+#[derive(PartialEq)]
 pub enum CurrentScreen {
   Main,
-  Databases,
+  Backups,
+  BackupInspect { backup: BackupJob },
   Settings,
 }
 
 #[allow(unused)]
 pub struct App {
   should_quit: bool,
-  current_screen: CurrentScreen,
+  pub current_screen: CurrentScreen,
   pub list_state: ListState,
+  pub config: Config,
   pub database_connection: DatabaseConnection,
 }
 
 impl App {
   pub fn new() -> Self {
+    let config = Config::new();
     let mut list_state = ListState::default();
     list_state.select_first();
     Self {
       should_quit: false,
       current_screen: CurrentScreen::Main,
       list_state,
+      config,
       database_connection: DatabaseConnection::new(),
     }
   }
@@ -45,7 +55,7 @@ impl App {
   pub async fn run(&mut self) -> io::Result<()> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    execute!(stdout, EnterAlternateScreen)?;
 
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
@@ -57,9 +67,14 @@ impl App {
             eprintln!("Draw error: {}", e);
           }
         }
-        CurrentScreen::Databases => {
-          if let Err(e) = DatabasesScreen::draw(self, frame) {
+        CurrentScreen::Backups => {
+          if let Err(e) = BackupsScreen::draw(self, frame) {
             eprintln!("Draw error: {}", e);
+          }
+        }
+        CurrentScreen::BackupInspect { ref backup } => {
+          if let Err(e) = BackupInspectScreen::draw(self, backup.clone(), frame) {
+            eprintln!("Draw error: {}", e)
           }
         }
         CurrentScreen::Settings => {
@@ -75,11 +90,7 @@ impl App {
     }
 
     disable_raw_mode()?;
-    execute!(
-      terminal.backend_mut(),
-      LeaveAlternateScreen,
-      DisableMouseCapture
-    )?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal.show_cursor()?;
 
     Ok(())
@@ -96,17 +107,39 @@ impl App {
     }
 
     match (&self.current_screen, key.code) {
-      (CurrentScreen::Main, KeyCode::Down) => self.list_state.select_next(),
-      (CurrentScreen::Main, KeyCode::Up) => self.list_state.select_previous(),
+      (
+        CurrentScreen::Main | CurrentScreen::Backups | CurrentScreen::BackupInspect { backup: _ },
+        KeyCode::Down,
+      ) => self.list_state.select_next(),
+      (
+        CurrentScreen::Main | CurrentScreen::Backups | CurrentScreen::BackupInspect { backup: _ },
+        KeyCode::Up,
+      ) => self.list_state.select_previous(),
       (CurrentScreen::Main, KeyCode::Enter) => {
         let items = HomeScreen::list_items();
         if let Some(idx) = self.list_state.selected() {
           match items[idx] {
-            HomeItem::Databases => self.set_screen(CurrentScreen::Databases),
+            HomeItem::Backups => self.set_screen(CurrentScreen::Backups),
             HomeItem::Settings => self.set_screen(CurrentScreen::Settings),
             HomeItem::Exit => self.should_quit = true,
           }
         }
+      }
+      (CurrentScreen::Backups, KeyCode::Enter) => {
+        let items = BackupsScreen::list_items(self);
+        if let Some(idx) = self.list_state.selected() {
+          let backup = self
+            .config
+            .backups
+            .get(&format!("backup.{}", items[idx]))
+            .expect("Backup not found");
+          self.set_screen(CurrentScreen::BackupInspect {
+            backup: backup.clone(),
+          })
+        }
+      }
+      (CurrentScreen::Backups | CurrentScreen::Settings, KeyCode::Backspace) => {
+        self.set_screen(CurrentScreen::Main)
       }
       (_, KeyCode::Char('q') | KeyCode::Esc) => self.should_quit = true,
       _ => {}

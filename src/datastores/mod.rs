@@ -58,6 +58,13 @@ impl Datastore {
     }
   }
 
+  pub fn get_base_path(&self) -> String {
+    match self {
+      Datastore::FileSystem(store) => store.base_path.display().to_string(),
+      Datastore::S3(store) => store.base_path.display().to_string(),
+    }
+  }
+
   pub fn check_backup_integrity(&self) -> Result<bool, String> {
     delegate_to_datastore!(self, check_backup_integrity())
   }
@@ -99,6 +106,42 @@ impl Datastore {
     match self {
       Datastore::FileSystem(store) => store.open_read_stream(object_name).await,
       Datastore::S3(store) => store.open_read_stream(object_name).await,
+    }
+  }
+
+  pub fn get_backups(&self, backup_identifier: &str) -> Vec<(String, Datastore)> {
+    let backup_dir_prefix = format!("backup_{backup_identifier}_");
+
+    match self {
+      Datastore::FileSystem(store) => store
+        .list_backups()
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|store| {
+          let dir_name = store.base_path.file_name()?.to_str()?.to_string();
+
+          if dir_name.starts_with(&backup_dir_prefix) {
+            Some((dir_name, Datastore::FileSystem(store)))
+          } else {
+            None
+          }
+        })
+        .collect::<Vec<_>>(),
+
+      Datastore::S3(store) => store
+        .list_backups()
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|store| {
+          let dir_name = store.base_path.file_name()?.to_str()?.to_string();
+
+          if dir_name.starts_with(&backup_dir_prefix) {
+            Some((dir_name, Datastore::S3(store)))
+          } else {
+            None
+          }
+        })
+        .collect::<Vec<_>>(),
     }
   }
 }
